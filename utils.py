@@ -1,8 +1,26 @@
 import typing as tp
 
+import copy
+
 from torch import nn
 from trl import PPOTrainer
 from transformers.modeling_outputs import CausalLMOutputWithPast
+
+
+###############################################################################
+# Helper Functions
+###############################################################################
+
+def freeze(model: nn.Module) -> nn.Module:
+    """
+    Get a frozen copy of a model.
+    """
+    frozen = copy.deepcopy(model)
+
+    for param in frozen.parameters():
+        param.requires_grad = False
+
+    return frozen
 
 
 ###############################################################################
