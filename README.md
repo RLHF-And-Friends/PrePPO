@@ -3,7 +3,7 @@
 ---
 
 ### Motivation and Background  
-Reinforcement Learning with Human Feedback (RLHF) has become the standard for fine-tuning large language models (LLMs), leveraging human guidance to enhance performance. However, as highlighted by [OpenFedLLM (Ye et al., 2024)](https://arxiv.org/abs/2402.06954):  
+Reinforcement Learning with Human Feedback (RLHF) has become the standard for fine-tuning large language models (LLMs), leveraging human guidance to enhance performance. However, as highlighted in [OpenFedLLM (Ye et al., 2024)](https://arxiv.org/abs/2402.06954):  
 
 > "Trained on massive publicly available data, large language models (LLMs) have demonstrated tremendous success across various fields. While more data contributes to better performance, a disconcerting reality is that high-quality public data will be exhausted in a few years. To address this, collaborative and privacy-preserving LLM training on underutilized distributed private data via federated learning (FL) offers a promising solution."
 
