@@ -19,7 +19,7 @@ The key challenge is enabling isolated LLMs to share knowledge securely and effe
 
 - **Federated LLM Fine-Tuning**. Recent works ([Ye et al., 2024](https://arxiv.org/abs/2402.06954); [Sun et al., 2024](https://arxiv.org/abs/2403.12313); [Zhang et al., 2023](https://arxiv.org/abs/2305.05644)) integrate FL with Parameter-Efficient Fine-Tuning (PEFT) for LLMs. While advancing privacy-preserving training, these approaches do not incorporate RLHF directly.  
 
-- **Federated RLHF** has only been explored by [Feijie Wu et al. 2024](https://arxiv.org/abs/2407.03038); [2025](https://openreview.net/forum?id=mqNKiEB6pd)), who propose a DPO-based method. Other RLHF approaches, like PPO, remain unexplored.  
+- **Federated RLHF** has only been explored by [Feijie Wu et al. 2024](https://arxiv.org/abs/2407.03038), [2025](https://openreview.net/forum?id=mqNKiEB6pd), who propose a DPO-based method. Other RLHF approaches, like PPO, remain unexplored.  
 
 **Gap in Literature**. No existing work examines RLHF methods such as PPO within FL frameworks. Addressing this gap could enable more scalable, privacy-preserving, and effective LLM fine-tuning.
 
