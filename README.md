@@ -38,4 +38,4 @@ We implemented the algorithm pipeline using the Hugging Face framework and condu
 
 ---
 
-Check out our [presentation](https://federated-rlhf-federated-sp16knx.gamma.site/) for YSDA if you are into a more visual approach.
+Check out our [YSDA presentation](https://federated-rlhf-federated-sp16knx.gamma.site/) for some details yet not coverd here or if you are just into a more visual approach.
