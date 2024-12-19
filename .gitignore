@@ -1,1 +1,5 @@
+# venv
 .fed-ppo-venv
+
+# logs
+wandb
