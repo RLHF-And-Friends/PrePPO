@@ -13,20 +13,15 @@ The key challenge is enabling isolated LLMs to share knowledge securely and effe
 
 ### Related Work  
 
-#### Federated Learning (FL)  
-Classical approaches like FedAvg ([McMahan et al., 2017](https://arxiv.org/abs/1602.05629)) and policy gradient sharing ([Geyer et al., 2017](https://arxiv.org/abs/1712.07557)) laid the groundwork for distributed training. However, their computational demands and potential privacy risks limit their applicability to LLM pipelines.  
+- **Federated Learning (FL)**. Classical approaches like FedAvg ([McMahan et al., 2017](https://arxiv.org/abs/1602.05629)) and policy gradient sharing ([Geyer et al., 2017](https://arxiv.org/abs/1712.07557)) laid the groundwork for distributed training. However, their computational demands and potential privacy risks limit their applicability to LLM pipelines.  
 
-#### Reinforcement Learning with Human Feedback (RLHF)  
-RLHF ([Christiano et al., 2017](https://arxiv.org/abs/1706.03741); [Ziegler et al., 2019](https://arxiv.org/abs/1909.08593)) improves model alignment with human preferences using techniques like PPO ([Schulman et al., 2017](https://arxiv.org/abs/1707.06347)) and DPO ([Rafailov et al., 2023](https://arxiv.org/abs/2305.18290)). Despite its effectiveness, RLHF remains largely centralized, limiting scalability and privacy.  
+- **Reinforcement Learning with Human Feedback (RLHF)** ([Christiano et al., 2017](https://arxiv.org/abs/1706.03741); [Ziegler et al., 2019](https://arxiv.org/abs/1909.08593)) improves model alignment with human preferences using techniques like PPO ([Schulman et al., 2017](https://arxiv.org/abs/1707.06347)) and DPO ([Rafailov et al., 2023](https://arxiv.org/abs/2305.18290)). Despite its effectiveness, RLHF remains largely centralized, limiting scalability and privacy.  
 
-#### Federated LLM Fine-Tuning  
-Recent works ([Ye et al., 2024](https://arxiv.org/abs/2402.06954); [Sun et al., 2024](https://arxiv.org/abs/2403.12313); [Zhang et al., 2023](https://arxiv.org/abs/2305.05644)) integrate FL with Parameter-Efficient Fine-Tuning (PEFT) for LLMs. While advancing privacy-preserving training, these approaches do not incorporate RLHF directly.  
+- **Federated LLM Fine-Tuning**. Recent works ([Ye et al., 2024](https://arxiv.org/abs/2402.06954); [Sun et al., 2024](https://arxiv.org/abs/2403.12313); [Zhang et al., 2023](https://arxiv.org/abs/2305.05644)) integrate FL with Parameter-Efficient Fine-Tuning (PEFT) for LLMs. While advancing privacy-preserving training, these approaches do not incorporate RLHF directly.  
 
-#### Federated RLHF  
-Federated RLHF has only been explored by Feijie Wu et al. ([2024](https://arxiv.org/abs/2407.03038); [2025](https://openreview.net/forum?id=mqNKiEB6pd)), who propose a DPO-based method. Other RLHF approaches, like PPO, remain unexplored.  
+- **Federated RLHF** has only been explored by Feijie Wu et al. ([2024](https://arxiv.org/abs/2407.03038); [2025](https://openreview.net/forum?id=mqNKiEB6pd)), who propose a DPO-based method. Other RLHF approaches, like PPO, remain unexplored.  
 
-#### Gap in Literature  
-No existing work examines RLHF methods such as PPO within FL frameworks. Addressing this gap could enable more scalable, privacy-preserving, and effective LLM fine-tuning.
+**Gap in Literature**. No existing work examines RLHF methods such as PPO within FL frameworks. Addressing this gap could enable more scalable, privacy-preserving, and effective LLM fine-tuning.
 
 ---
 
