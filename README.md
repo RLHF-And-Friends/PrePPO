@@ -34,22 +34,8 @@ No existing work examines RLHF methods such as PPO within FL frameworks. Address
 
 Our primary contribution is the development of the Federated PPO algorithm, which enables communication between agents through a generalized KL-penalty. Traditionally used as a trust-region soft constraint for stable training, we extend the KL-penalty to act as an optimization trajectory attractor. This novel use aligns individual policies with the learning directions of other agents, enabling private yet effective information exchange and enhancing collaborative training.
 
-We implemented the algorithm pipeline using the Hugging Face framework and conducted initial toy experiments. These results demonstrate promising performance improvements for collaboratively trained models compared to isolated training.Initial Results:
+We implemented the algorithm pipeline using the Hugging Face framework and conducted initial toy experiments. These results demonstrate promising performance improvements for collaboratively trained models compared to isolated training.
 
 ---
 
-### Algorithm Overview
-
-Federated PPO Algorithm Steps:
-
-1. Local Training:
-   - Agents train locally using standard PPO.
-2. Reference Policy Exchange:
-   - Agents communicate their reference policies.
-3. Generalized KL-Penalty:
-   - Combines received reference policies into a cooperative reference.
-   - Use this as the new penalty for local PPO updates:
-4. Policy Update:
-   - Perform PPO updates using the generalized KL-penalty.
-
----
+Check out our [presentation](https://federated-rlhf-federated-sp16knx.gamma.site/) for YSDA if you are into a more visual approach.
