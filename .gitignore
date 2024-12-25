@@ -4,5 +4,6 @@
 # logs
 wandb
 
-# cache
+# python
+.python-version
 __pycache__
