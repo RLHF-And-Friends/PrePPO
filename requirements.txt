@@ -1,8 +1,0 @@
-trl
-transformers
-peft
-accelerate
-datasets
-bitsandbytes
-ipywidgets
-wandb

@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fed-ppo"
+version = "0.0.1"
+authors = [
+    {name = "Arkadiy Vladimirov", email = "ark.vladimirov@outlook.com"},
+    {name = "Evgeny Gurov", email = "evgurovv@gmail.com"},
+]
+description = "Federated RLHF - Federated PPO for Cooperative Policy Optimization"
+readme = "README.md"
+license = { file = "LICENSE.md" }
+requires-python = ">=3.12"
+dependencies = [
+    "trl",
+    "transformers",
+    "peft",
+    "accelerate",
+    "datasets",
+    "bitsandbytes",
+    "ipywidgets",
+    "wandb",
+]
+
+[project.scripts]
+# rm = "fed-ppo.scripts.rm:run"
+# ppo = "fed-ppo.scripts.ppo:run"
+# fed-ppo = "fed-ppo.scripts.fed_ppo:run"
