@@ -2,14 +2,19 @@ import typing as tp
 
 import copy
 
+from dataclasses import dataclass
+
 from torch import nn
 from trl import PPOTrainer
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
 
-###############################################################################
+# =================================================================================================
 # Helper Functions
-###############################################################################
+# =================================================================================================
+
+# Copy and freeze model
+# -------------------------------------------------------------------------------------------------
 
 def freeze(model: nn.Module) -> nn.Module:
     """
@@ -23,9 +28,33 @@ def freeze(model: nn.Module) -> nn.Module:
     return frozen
 
 
-###############################################################################
+# Create optimizer with different lerning rates for different parameters (e.g. LoRA and head)
+# -------------------------------------------------------------------------------------------------
+
+@dataclass
+class OptimizerConfig:
+    optimizer_type: type
+    layer_lr: dict[str, float]
+
+
+def custom_optimizer(model: nn.Module, config: OptimizerConfig):
+    layer_params = {layer_name: [] for layer_name in config.layer_lr}
+    for params_name, params in model.named_parameters():
+        for layer_name in layer_params:
+            if layer_name in params_name and params.requires_grad:
+                layer_params[layer_name].append(params)
+
+    optimizer_grouped_parameters = [
+        {"params": layer_params[layer_name], "lr": config.layer_lr[layer_name]} 
+        for layer_name in layer_params
+    ]
+
+    return config.optimizer_type(optimizer_grouped_parameters)
+
+
+# =================================================================================================
 # Policies mixture class
-###############################################################################
+# =================================================================================================
 
 class PolicyMixture(nn.Module):
     """
@@ -52,9 +81,9 @@ class PolicyMixture(nn.Module):
         return CausalLMOutputWithPast(logits=res_logits)
 
 
-###############################################################################
+# =================================================================================================
 # Policy Commutator
-###############################################################################
+# =================================================================================================
 
 Matrix = tp.Sequence[tp.Sequence[float]]
 
@@ -82,9 +111,9 @@ class PolicyCommutator:
         return PolicyMixture(self._policies, self._commutant[idx])
 
 
-###############################################################################
+# =================================================================================================
 # CustomPPOTrainer
-###############################################################################
+# =================================================================================================
 
 class CustomPPOTrainer(PPOTrainer):
     """
@@ -100,4 +129,3 @@ class CustomPPOTrainer(PPOTrainer):
 
         if hasattr(self.args, "exp_name"):
             self.args.run_name = f"{self.args.exp_name}"
-
