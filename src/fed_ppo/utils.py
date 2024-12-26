@@ -4,9 +4,14 @@ import copy
 
 from dataclasses import dataclass
 
+from datasets import Dataset
+
 from torch import nn
-from trl import PPOTrainer
+
+from transformers import PreTrainedTokenizer
 from transformers.modeling_outputs import CausalLMOutputWithPast
+
+from trl import PPOTrainer
 
 
 # =================================================================================================
@@ -50,6 +55,32 @@ def custom_optimizer(model: nn.Module, config: OptimizerConfig):
     ]
 
     return config.optimizer_type(optimizer_grouped_parameters)
+
+
+# Prepare dataset for PPO trainer
+# -------------------------------------------------------------------------------------------------
+
+def prepare_ppo_dataset(
+    dataset: Dataset, 
+    tokenizer: PreTrainedTokenizer, 
+    prompt_field: str = "prompt"
+):
+    """
+    pre-tokenize the dataset before training; only collate during training
+    """
+
+    def tokenize(element):
+        outputs = tokenizer(
+            element[prompt_field],
+            padding=False,
+        )
+        return {"input_ids": outputs["input_ids"]}
+
+    return dataset.map(
+        tokenize,
+        batched=True,
+        remove_columns=dataset.column_names
+    )
 
 
 # =================================================================================================
