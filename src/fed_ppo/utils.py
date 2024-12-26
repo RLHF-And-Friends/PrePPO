@@ -21,7 +21,7 @@ from trl import PPOTrainer
 # Copy and freeze model
 # -------------------------------------------------------------------------------------------------
 
-def freeze(model: nn.Module) -> nn.Module:
+def frozen_copy(model: nn.Module) -> nn.Module:
     """
     Get a frozen copy of a model.
     """
@@ -50,7 +50,7 @@ def custom_optimizer(model: nn.Module, config: OptimizerConfig):
                 layer_params[layer_name].append(params)
 
     optimizer_grouped_parameters = [
-        {"params": layer_params[layer_name], "lr": config.layer_lr[layer_name]} 
+        {"params": layer_params[layer_name], "lr": config.layer_lr[layer_name]}
         for layer_name in layer_params
     ]
 
@@ -92,9 +92,10 @@ class PolicyMixture(nn.Module):
     Weighted normalized sum of policies. Policies contribute proportionally to
     coefficients given.
     """
+
     def __init__(
-        self, 
-        policies: tp.Sequence[nn.Module], 
+        self,
+        policies: tp.Sequence[nn.Module],
         coefs: tp.Sequence[float]
     ) -> None:
 
@@ -102,13 +103,13 @@ class PolicyMixture(nn.Module):
 
         self._policies = nn.ModuleList(policies)
         self._coefs = coefs
-        
+
     def forward(self, *args, **kwargs):
         logits = []
         for policy, coef in zip(self._policies, self._coefs):
             logits.append(policy(*args, **kwargs).logits * coef)
         res_logits = sum(logits) / sum(self._coefs)
-        
+
         return CausalLMOutputWithPast(logits=res_logits)
 
 
@@ -118,11 +119,13 @@ class PolicyMixture(nn.Module):
 
 Matrix = tp.Sequence[tp.Sequence[float]]
 
+
 class PolicyCommutator:
     """
     Policy mixture dispatcher for a set of policies according to commutation
     matrix.
     """
+
     def __init__(
         self,
         policies: tp.Sequence[nn.Module],
