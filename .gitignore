@@ -1,8 +1,9 @@
 # venv
 .fed-ppo-venv
 
-# pyenv
-.python-version
-
 # logs
 wandb
+
+# python
+.python-version
+__pycache__
