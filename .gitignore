@@ -3,6 +3,7 @@
 
 # logs
 wandb
+Llama*
 
 # python
 .python-version
