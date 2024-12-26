@@ -8,3 +8,4 @@ Llama*
 # python
 .python-version
 __pycache__
+*.egg-info
