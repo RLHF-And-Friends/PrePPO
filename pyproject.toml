@@ -25,6 +25,6 @@ dependencies = [
 ]
 
 [project.scripts]
-# rm = "fed-ppo.scripts.rm:run"
-# ppo = "fed-ppo.scripts.ppo:run"
-# fed-ppo = "fed-ppo.scripts.fed_ppo:run"
+# rm = "fed_ppo.scripts.rm:run"
+# ppo = "fed_ppo.scripts.ppo:run"
+# fed-ppo = "fed_ppo.scripts.fed_ppo:run"
