@@ -69,9 +69,10 @@ def apply_chat_template(
     tackle prompt as user chat message
     """
     def foo(element: dict):
-        outputs = tokenizer.apply_chat_template(
-            [{"user": element[prompt_field]}],
-        )
+        outputs = tokenizer.apply_chat_template([{
+            "role": "user",
+            "content": element[prompt_field]
+        }])
         return {prompt_field: outputs}
 
     return dataset.map(
