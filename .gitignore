@@ -6,6 +6,3 @@
 
 # logs
 wandb
-
-# cache
-__pycache__
