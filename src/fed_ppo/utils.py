@@ -63,7 +63,8 @@ def custom_optimizer(model: nn.Module, config: OptimizerConfig):
 def apply_chat_template(
     dataset: Dataset,
     tokenizer: PreTrainedTokenizer,
-    prompt_field: str = "prompt"
+    prompt_field: str = "prompt",
+    tokenize: bool = False
 ):
     """
     tackle prompt as user chat message
@@ -72,12 +73,12 @@ def apply_chat_template(
         outputs = tokenizer.apply_chat_template([{
             "role": "user",
             "content": element[prompt_field]
-        }])
+        }], tokenize=tokenize)
         return {prompt_field: outputs}
 
     return dataset.map(
         foo,
-        batched=True,
+        batched=False,
         remove_columns=dataset.column_names
     )
 
