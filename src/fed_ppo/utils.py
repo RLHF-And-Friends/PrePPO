@@ -60,7 +60,7 @@ def custom_optimizer(model: nn.Module, config: OptimizerConfig):
 # Prepare dataset for PPO trainer
 # -------------------------------------------------------------------------------------------------
 
-def tokenize_as_chat(
+def apply_chat_template(
     dataset: Dataset,
     tokenizer: PreTrainedTokenizer,
     prompt_field: str = "prompt",
@@ -69,11 +69,12 @@ def tokenize_as_chat(
     tackle prompt as user chat message
     """
     def foo(element: dict):
-        outputs = tokenizer.apply_chat_template([{
-            "role": "user",
-            "content": element[prompt_field]
-        }], tokenize=True)
-        return {"input_ids": outputs}
+        outputs = tokenizer.apply_chat_template(
+            [{"role": "user", "content": element[prompt_field]}], 
+            add_generation_prompt=True,
+            tokenize=False,
+        )
+        return {"prompt": outputs}
 
     return dataset.map(
         foo,
@@ -100,7 +101,7 @@ def tokenize_prompt(
 
     return dataset.map(
         tokenize,
-        batched=True,
+        batched=False,
         remove_columns=dataset.column_names
     )
 
