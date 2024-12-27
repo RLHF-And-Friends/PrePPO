@@ -1,17 +1,14 @@
+from __future__ import annotations
 import typing as tp
-
 import copy
+import wandb
 
 from dataclasses import dataclass
 
-from datasets import Dataset
-
 from torch import nn
-
+from datasets import Dataset
 from transformers import PreTrainedTokenizer
 from transformers.modeling_outputs import CausalLMOutputWithPast
-
-from trl import PPOTrainer
 
 
 # =================================================================================================
@@ -165,3 +162,71 @@ class PolicyCommutator:
 
     def get_reference_policy(self, idx: int) -> PolicyMixture:
         return PolicyMixture(self._policies, self._commutant[idx])
+
+
+# =================================================================================================
+# Wandb Session Context Manger
+# =================================================================================================
+
+class WandbSessionManager:
+    def __init__(self, num_sessions: int) -> None:
+        self._run_id_map: list[tp.Optional[int]] = num_sessions * [None]
+
+    def __getitem__(self, idx: int) -> WandbSessionBuilder:
+        return WandbSessionBuilder(
+            manager=self,
+            run_id=self._run_id_map[idx],
+            idx=idx,
+        )
+
+    def __setitem__(self, idx: int, run_id: int) -> None:
+        self._run_id_map[idx] = run_id
+
+
+class WandbSessionBuilder:
+    def __init__(
+        self,
+        manager: WandbSessionManager,
+        idx: int,
+        run_id: tp.Optional[None]
+    ) -> None:
+        self._manager = manager
+        self._idx = idx
+        self._run_id = run_id
+
+    def __call__(self, name: tp.Optional[str] = None) -> WandbSession:
+        return WandbSession(
+            manager=self._manager,
+            idx=self._idx,
+            run_id=self._run_id,
+            name=name
+        )
+
+
+class WandbSession:
+    """
+    Wandb Preemptible Session Context Manager.
+    """
+
+    def __init__(
+        self,
+        manager: WandbSessionManager,
+        idx: int,
+        run_id: tp.Optional[int] = None,
+        name: tp.Optional[str] = None,
+    ) -> None:
+        self._manager = manager
+        self._idx = idx
+        self._run_id = id
+        self._name = name
+
+    def __enter__(self) -> tp.Self:
+        run = wandb.init(
+            id=self._run_id,
+            name=self._name,
+            resume="allow"
+        )
+        self._manager[self._idx] = run.id
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        wandb.finish()
