@@ -165,23 +165,3 @@ class PolicyCommutator:
 
     def get_reference_policy(self, idx: int) -> PolicyMixture:
         return PolicyMixture(self._policies, self._commutant[idx])
-
-
-# =================================================================================================
-# CustomPPOTrainer
-# =================================================================================================
-
-class CustomPPOTrainer(PPOTrainer):
-    """
-    Slightly modified PPOTrainer.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Regular init with no cumbersome run renaming.
-        """
-
-        super().__init__(*args, **kwargs)
-
-        if hasattr(self.args, "exp_name"):
-            self.args.run_name = f"{self.args.exp_name}"
