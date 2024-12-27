@@ -47,7 +47,10 @@ class CustomPPOTrainer(PPOTrainer):
     def train(
         self,
         global_step: int = 0,
-    ):
+    ) -> int:
+        """
+        Returns the fucking global step
+        """
         args = self.args
         accelerator = self.accelerator
         optimizer = self.optimizer
@@ -84,7 +87,7 @@ class CustomPPOTrainer(PPOTrainer):
         model.train()
 
         # trainer state initialization
-        self.state.global_step = 0
+        self.state.global_step = global_step
         self.state.episode = 0
         self.state.max_steps = args.num_total_batches * args.num_mini_batches
         self.state.num_train_epochs = args.total_episodes / self.train_dataset_len
@@ -383,3 +386,5 @@ class CustomPPOTrainer(PPOTrainer):
         if self.control.should_save:
             self._save_checkpoint(model, trial=None, metrics=None)
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
+
+        return self.state.global_step
