@@ -175,8 +175,8 @@ class WandbSessionManager:
     def __getitem__(self, idx: int) -> WandbSessionBuilder:
         return WandbSessionBuilder(
             manager=self,
-            run_id=self._run_id_map[idx],
             idx=idx,
+            run_id=self._run_id_map[idx],
         )
 
     def __setitem__(self, idx: int, run_id: int) -> None:
@@ -217,7 +217,7 @@ class WandbSession:
     ) -> None:
         self._manager = manager
         self._idx = idx
-        self._run_id = id
+        self._run_id = run_id
         self._name = name
 
     def __enter__(self) -> tp.Self:
@@ -227,6 +227,7 @@ class WandbSession:
             resume="allow"
         )
         self._manager[self._idx] = run.id
+        return self
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         wandb.finish()
