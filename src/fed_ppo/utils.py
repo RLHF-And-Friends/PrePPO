@@ -6,9 +6,13 @@ import wandb
 from dataclasses import dataclass
 
 from torch import nn
+
 from datasets import Dataset
+
 from transformers import PreTrainedTokenizer
 from transformers.modeling_outputs import CausalLMOutputWithPast
+
+from trl.data_utils import is_conversational
 
 
 # =================================================================================================
@@ -54,53 +58,65 @@ def custom_optimizer(model: nn.Module, config: OptimizerConfig):
     return config.optimizer_type(optimizer_grouped_parameters)
 
 
-# Prepare dataset for PPO trainer
+# Prepare dataset
 # -------------------------------------------------------------------------------------------------
 
-def apply_chat_template(
-    dataset: Dataset,
-    tokenizer: PreTrainedTokenizer,
-    prompt_field: str = "prompt",
-):
-    """
-    tackle prompt as user chat message
-    """
-    def foo(element: dict):
-        outputs = tokenizer.apply_chat_template(
-            [{"role": "user", "content": element[prompt_field]}], 
-            add_generation_prompt=True,
-            tokenize=False,
+def apply_chat_template(element, tokenizer: PreTrainedTokenizer):
+    # PPO dataset
+    # ---------------------------------------------------------------------------------------------
+    if "prompt" in element.keys():
+        if is_conversational(element):
+            prompt = element["prompt"]
+        else:
+            prompt = [{"role": "user", "content": element["prompt"]}]
+
+        element["prompt"] = tokenizer.apply_chat_template(
+            prompt,
+            add_generation_prompt = True, # gen prompt is needed
+            tokenize = False,
         )
-        return {"prompt": outputs}
 
-    return dataset.map(
-        foo,
-        batched=False,
-        remove_columns=dataset.column_names
-    )
+    # Preference dataset
+    # ---------------------------------------------------------------------------------------------
+    if "chosen" in element.keys() and "rejected" in element.keys():
+        # Apply chat template only if preference dataset is conversational
+        if is_conversational(element):
+            element["chosen"] = tokenizer.apply_chat_template(
+                element["chosen"],
+                add_generation_prompt = False, # do not need gen prompt here
+                tokenize = False,
+            )
+            element["rejected"] = tokenizer.apply_chat_template(
+                element["rejected"],
+                add_generation_prompt = False, # do not need gen prompt here
+                tokenize = False,
+            )
+
+    return element
 
 
-def tokenize_prompt(
-    dataset: Dataset,
-    tokenizer: PreTrainedTokenizer,
-    prompt_field: str = "prompt"
-):
-    """
-    pre-tokenize the dataset before training; only collate during training
-    """
+def tokenize(element, tokenizer: PreTrainedTokenizer):
+    # PPO dataset
+    # ---------------------------------------------------------------------------------------------
+    if "prompt" in element.keys():
+        tokenized = tokenizer(element["prompt"], add_special_tokens=False)
+        
+        element["input_ids"] = tokenized["input_ids"]
+        element["attention_mask"] = tokenized["attention_mask"]
 
-    def tokenize(element):
-        outputs = tokenizer(
-            element[prompt_field],
-            padding=False,
-        )
-        return {"input_ids": outputs["input_ids"]}
-
-    return dataset.map(
-        tokenize,
-        batched=False,
-        remove_columns=dataset.column_names
-    )
+    # Preference dataset
+    # ---------------------------------------------------------------------------------------------
+    if "chosen" in element.keys() and "rejected" in element.keys():
+        chosen_tokenized = tokenizer(element["chosen"], add_special_tokens=False)
+        rejected_tokenized = tokenizer(element["rejected"], add_special_tokens=False)
+        
+        element["input_ids_chosen"] = chosen_tokenized["input_ids"]
+        element["attention_mask_chosen"] = chosen_tokenized["attention_mask"]
+        element["input_ids_rejected"] = rejected_tokenized["input_ids"]
+        element["attention_mask_rejected"] = rejected_tokenized["attention_mask"]
+        
+    
+    return element
 
 
 # =================================================================================================
