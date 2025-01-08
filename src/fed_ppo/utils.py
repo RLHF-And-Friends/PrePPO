@@ -102,7 +102,6 @@ def tokenize(element, tokenizer: PreTrainedTokenizer):
         tokenized = tokenizer(element["prompt"], add_special_tokens=False)
         
         element["input_ids"] = tokenized["input_ids"]
-        element["attention_mask"] = tokenized["attention_mask"]
 
     # Preference dataset
     # ---------------------------------------------------------------------------------------------
