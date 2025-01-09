@@ -7,8 +7,6 @@ from dataclasses import dataclass
 
 from torch import nn
 
-from datasets import Dataset
-
 from transformers import PreTrainedTokenizer
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
@@ -61,14 +59,25 @@ def custom_optimizer(model: nn.Module, config: OptimizerConfig):
 # Prepare dataset
 # -------------------------------------------------------------------------------------------------
 
-def apply_chat_template(element, tokenizer: PreTrainedTokenizer):
+def apply_chat_template(
+    element,
+    tokenizer: PreTrainedTokenizer, 
+    system_prompt: str = None
+):
     # PPO dataset
     # ---------------------------------------------------------------------------------------------
     if "prompt" in element.keys():
         if is_conversational(element):
             prompt = element["prompt"]
+        elif system_prompt is not None:
+            prompt = [
+                {'role': "system", 'content': system_prompt},
+                {"role": "user", "content": element["prompt"]}
+            ]
         else:
-            prompt = [{"role": "user", "content": element["prompt"]}]
+            prompt = [
+                {"role": "user", "content": element["prompt"]}
+            ]
 
         element["prompt"] = tokenizer.apply_chat_template(
             prompt,
