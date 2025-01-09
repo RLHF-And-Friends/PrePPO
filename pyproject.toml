@@ -22,6 +22,7 @@ dependencies = [
     "bitsandbytes",
     "ipywidgets",
     "wandb",
+    "openai"
 ]
 
 [project.scripts]
