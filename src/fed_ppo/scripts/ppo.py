@@ -38,9 +38,6 @@ To do so make sure that in advance you have
     accelerate config
 
 And that's it.
-
-Note that model checkpointing and saving of any kind does not work in
-multi-GPU settng for now. Unwrap DDP model and save it manually.
 """
 
 ### Models & Dataset
@@ -125,25 +122,21 @@ reward_model_config = ModelConfig(
 ppo_config = PPOConfig(
     # Common
     # ---------------------------------------------------------------------------------------------
-    exp_name            = f"{POLICY_NAME}-2-GPU-BatchSize-16",
+    exp_name            = f"{POLICY_NAME}-Dual-GPU-BatchSize-16",
     output_dir          = f"{os.environ['WANDB_PROJECT']}-LoRA-{policy_model_config.lora_r}",
     dataset_num_proc    = 16,
     num_mini_batches    = 1,
     learning_rate       = 1e-5,
     # Make sure the desired effective batch size == batch_size * accum_steps * num_devices
-    per_device_train_batch_size = 2,
+    per_device_train_batch_size = 1,
     per_device_eval_batch_size  = 2,
-    gradient_accumulation_steps = 4,
+    gradient_accumulation_steps = 1,
     num_train_epochs    = 1,
     response_length     = 512,
     stop_token          = "eos",
     # Logging
     # ---------------------------------------------------------------------------------------------
-    # save_steps          = 10,
-    # not supported for multi-GPU
-    save_strategy       = 'no',
-    logging_steps       = 10,
-    eval_steps          = 10,
+    save_steps          = 100,
     
     # Push to hub after training
     # ---------------------------------------------------------------------------------------------
