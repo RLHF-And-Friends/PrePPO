@@ -11,7 +11,7 @@ import torch.nn.functional as F
 
 from collections import defaultdict
 
-from trl import PPOTrainer
+from accelerate.utils import gather_object
 
 from transformers import (
     GenerationConfig,
@@ -24,6 +24,7 @@ from trl.trainer.utils import (
     get_reward,
     truncate_response,
 )
+from trl import PPOTrainer
 from trl.core import masked_mean, masked_whiten
 from trl.models.utils import unwrap_model_for_generation
 
