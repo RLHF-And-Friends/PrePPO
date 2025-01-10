@@ -1,12 +1,17 @@
-import torch
-from trl import PPOTrainer
-
 import gc
 import math
 import time
+import torch
+import wandb
 
 import numpy as np
+import pandas as pd
+import typing as tp
 import torch.nn.functional as F
+
+from collections import defaultdict
+
+from trl import Trainer, PPOTrainer
 
 from transformers import (
     GenerationConfig,
@@ -388,3 +393,88 @@ class CustomPPOTrainer(PPOTrainer):
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
 
         return self.state.global_step
+
+
+    def generate_completions(self, sampling: bool = False):
+        args = self.args
+        processing_class = self.processing_class
+        generation_config = GenerationConfig(
+            max_new_tokens=self.args.response_length,
+            temperature=(0.01 + 1e-7),
+            top_k=0.0,
+            top_p=1.0,
+            do_sample=True,
+        )
+
+        table = defaultdict(list)
+        with unwrap_model_for_generation(self.model, self.accelerator) as unwrapped_model:
+            for batch in self.eval_dataloader:
+                query = batch["input_ids"]
+                with torch.no_grad():
+                    context_length = query.shape[1]
+                    query_response, _ = batch_generation(
+                        unwrapped_model.policy,
+                        query,
+                        query.shape[0],
+                        processing_class.pad_token_id,
+                        generation_config,
+                    )
+                    response = query_response[:, context_length:]
+                    postprocessed_response = response
+                    if args.stop_token_id is not None:  # handle the edge case when stop_token_id exists but is 0
+                        postprocessed_response = truncate_response(
+                            args.stop_token_id, processing_class.pad_token_id, response
+                        )
+                    table["query"].extend(
+                        gather_object(processing_class.batch_decode(query, skip_special_tokens=True))
+                    )
+                    table["model response"].extend(
+                        gather_object(processing_class.batch_decode(postprocessed_response))
+                    )
+
+                    postprocessed_query_response = torch.cat((query, postprocessed_response), 1)
+                    _, score, _ = get_reward(
+                        self.reward_model, postprocessed_query_response, processing_class.pad_token_id, context_length
+                    )
+                    table["score"].extend(self.accelerator.gather(score).float().cpu().numpy())
+
+                if sampling:
+                    break
+
+        df = pd.DataFrame(table)
+
+        if self.accelerator.is_main_process:
+            # disable table as console output
+            # print_rich_table(df.iloc[0 : 0 + 5])
+
+            if "wandb" in args.report_to:
+                # fuck this
+                # import wandb
+
+                if wandb.run is not None:
+                    wandb.log({"completions": wandb.Table(dataframe=df)})
+
+            # and this
+            # if "comet_ml" in args.report_to:
+            #     log_table_to_comet_experiment(
+            #         name="completions.csv",
+            #         table=df,
+            #     )
+
+    def save_model(self, output_dir: tp.Optional[str] = None, _internal_call: bool = False):
+        backup_model = self.model
+        # would fix ddp save maybe?
+        self.model = self.accelerator.unwrap_model(self.model)
+        self.model = self.model.policy  # save only the policy
+
+        if self.is_deepspeed_enabled:
+            backup_deepspeed = self.deepspeed
+            self.deepspeed = self.model
+
+        # Emulate PPOTrainer MRO
+        super(PPOTrainer, self).save_model(output_dir, _internal_call)
+
+        self.model = backup_model
+
+        if self.is_deepspeed_enabled:
+            self.deepspeed = backup_deepspeed
