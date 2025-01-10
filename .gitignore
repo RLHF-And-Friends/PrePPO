@@ -1,5 +1,8 @@
 # venv
 .fed-ppo-venv
+.venv
+.env
+activate
 
 # logs
 wandb
