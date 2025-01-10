@@ -11,7 +11,7 @@ import torch.nn.functional as F
 
 from collections import defaultdict
 
-from trl import Trainer, PPOTrainer
+from trl import PPOTrainer
 
 from transformers import (
     GenerationConfig,
