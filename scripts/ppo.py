@@ -51,9 +51,6 @@ And that's it.
 
 # NAMES AND PATHS
 
-# Project name
-# =================================================================================================
-PROJECT_NAME = "Distributed-PPO"
 
 # Policy model path
 # =================================================================================================
@@ -71,6 +68,11 @@ DATASET_PATH        = "HuggingFaceH4/ultrachat_200k"
 DATASET_TRAIN_SPLIT = "train_gen"
 DATASET_VAL_SPLIT   = "test_gen"
 DATASET_NAME        = DATASET_PATH.split('/')[1]
+
+# Project name
+# =================================================================================================
+PROJECT_NAME = "Distributed-PPO"
+EXP_NAME = f"{POLICY_NAME}-Dual-GPU-BatchSize-16"
 
 ### WandB
 # =================================================================================================
@@ -129,8 +131,8 @@ reward_model_config = ModelConfig(
 ppo_config = PPOConfig(
     # Common
     # ---------------------------------------------------------------------------------------------
-    exp_name            = f"{POLICY_NAME}-Dual-GPU-BatchSize-16",
-    output_dir          = f"~/hf/models/{os.environ['WANDB_PROJECT']}-LoRA-{policy_model_config.lora_r}",
+    exp_name            = EXP_NAME
+    output_dir          = f"~/hf/models/{PROJECT_NAME}/{EXP_NAME}",
     dataset_num_proc    = 16,
     num_mini_batches    = 1,
     learning_rate       = 1e-5,
@@ -147,8 +149,7 @@ ppo_config = PPOConfig(
     # Push to hub after training
     # ---------------------------------------------------------------------------------------------
     push_to_hub         = True,
-    hub_model_id        = f"RLHF-And-Friends/{POLICY_NAME}-PPO-{DATASET_NAME}"
-                          f"-Dual-GPU",
+    hub_model_id        = f"RLHF-And-Friends/{EXP_NAME}",
     # On-policy params
     # ---------------------------------------------------------------------------------------------
     missing_eos_penalty = 0.0,
