@@ -72,7 +72,7 @@ DATASET_NAME        = DATASET_PATH.split('/')[1]
 # Project name
 # =================================================================================================
 PROJECT_NAME = "Distributed-PPO"
-EXP_NAME = f"{POLICY_NAME}-Dual-GPU-BatchSize-16"
+EXP_NAME = f"{POLICY_NAME}-1xA100-80GB-BatchSize-16-MaxTok-512"
 
 ### WandB
 # =================================================================================================
@@ -131,15 +131,15 @@ reward_model_config = ModelConfig(
 ppo_config = PPOConfig(
     # Common
     # ---------------------------------------------------------------------------------------------
-    exp_name            = EXP_NAME
+    exp_name            = EXP_NAME,
     output_dir          = f"~/hf/models/{PROJECT_NAME}/{EXP_NAME}",
     dataset_num_proc    = 16,
     num_mini_batches    = 1,
     learning_rate       = 1e-5,
     # Make sure the desired effective batch size == batch_size * accum_steps * num_devices
-    per_device_train_batch_size = 4,
-    per_device_eval_batch_size  = 4,
-    gradient_accumulation_steps = 2,
+    per_device_train_batch_size = 2,
+    per_device_eval_batch_size  = 2,
+    gradient_accumulation_steps = 8,
     num_train_epochs    = 1,
     response_length     = 512,
     stop_token          = "eos",
@@ -185,6 +185,7 @@ if tokenizer.pad_token is None:
 # -------------------------------------------------------------------------------------------------
 sft_policy = AutoModelForCausalLM.from_pretrained(
     policy_model_config.model_name_or_path,
+    use_cache = True,
 )
 sft_policy.resize_token_embeddings(len(tokenizer), mean_resizing=False)
 sft_policy.config.pad_token_id = tokenizer.pad_token_id
@@ -198,6 +199,7 @@ policy = get_peft_model(sft_policy, get_peft_config(policy_model_config))
 base_value_head_model = AutoModelForSequenceClassification.from_pretrained(
     policy_model_config.model_name_or_path,
     num_labels = 1,
+    use_cache = True,
 )
 base_value_head_model.resize_token_embeddings(len(tokenizer), mean_resizing=False)
 base_value_head_model.config.pad_token_id = tokenizer.pad_token_id

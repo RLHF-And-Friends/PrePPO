@@ -10,6 +10,7 @@ import typing as tp
 import torch.nn.functional as F
 
 from collections import defaultdict
+from datetime import datetime
 
 from accelerate.utils import gather_object
 
@@ -80,8 +81,8 @@ class CustomPPOTrainer(PPOTrainer):
             do_sample=True,
         )
 
-        accelerator.print("===training policy===")
         start_time = time.time()
+        accelerator.print(f"Trainer {datetime.now().strftime('%H:%M:%S')}: Started")
         stats_shape = (args.num_ppo_epochs, args.num_mini_batches, args.gradient_accumulation_steps)
         approxkl_stats = torch.zeros(stats_shape, device=device)
         pg_clipfrac_stats = torch.zeros(stats_shape, device=device)
@@ -133,6 +134,7 @@ class CustomPPOTrainer(PPOTrainer):
                 scores = []
                 sequence_lengths = []
                 values = []
+                accelerator.print(f"Trainer {datetime.now().strftime('%H:%M:%S')}: Model Inference")
                 with unwrap_model_for_generation(model, self.accelerator) as unwrapped_model:
                     query_responses, logitss = batch_generation(
                         unwrapped_model.policy,
@@ -142,6 +144,7 @@ class CustomPPOTrainer(PPOTrainer):
                         generation_config,
                     )
 
+                accelerator.print(f"Trainer {datetime.now().strftime('%H:%M:%S')}: Rollout Processing")
                 for i in range(0, queries.shape[0], args.local_rollout_forward_batch_size):
                     query = queries[i : i + args.local_rollout_forward_batch_size]
                     query_response = query_responses[i : i + args.local_rollout_forward_batch_size]
@@ -246,6 +249,7 @@ class CustomPPOTrainer(PPOTrainer):
                 torch.cuda.empty_cache()
 
             # Do multiple epochs of PPO training, with a fresh random shuffle in each epoch
+            accelerator.print(f"Trainer {datetime.now().strftime('%H:%M:%S')}: PPO Step")
             for ppo_epoch_idx in range(args.num_ppo_epochs):
                 b_inds = np.random.permutation(args.local_batch_size)
                 minibatch_idx = 0
@@ -326,6 +330,8 @@ class CustomPPOTrainer(PPOTrainer):
                     )
                     # fmt: on
                     torch.cuda.empty_cache()
+
+            accelerator.print(f"Trainer {datetime.now().strftime('%H:%M:%S')}: Gather Metrics")
             with torch.no_grad():
                 mean_kl = kl.sum(1).mean()
                 mean_entropy = (-logprobs).sum(1).mean()
@@ -387,6 +393,7 @@ class CustomPPOTrainer(PPOTrainer):
             )
             torch.cuda.empty_cache()
 
+        accelerator.print(f"Trainer {datetime.now().strftime('%H:%M:%S')}: Finished")
         # HF trainer specifics
         self.control = self.callback_handler.on_train_end(args, self.state, self.control)
         if self.control.should_save:
