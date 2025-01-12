@@ -48,9 +48,9 @@ In this case make sure that in advance you have
 And that's it.
 """
 
-
+###################################################################################################
 # NAMES AND PATHS
-
+###################################################################################################
 
 # Policy model path
 # =================================================================================================
@@ -74,13 +74,15 @@ DATASET_NAME        = DATASET_PATH.split('/')[1]
 PROJECT_NAME = "Distributed-PPO"
 EXP_NAME = f"{POLICY_NAME}-1xA100-80GB-BatchSize-16-MaxTok-512"
 
-### WandB
+# WandB
 # =================================================================================================
 os.environ["WANDB_PROJECT"] = PROJECT_NAME
 os.environ["WANDB_ENTITY"] = "RADFAN"
 
 
-### Configs
+###################################################################################################
+# CONFIGS
+###################################################################################################
 
 # Policy
 # =================================================================================================
@@ -94,6 +96,8 @@ policy_model_config = ModelConfig(
     lora_dropout         = 0.0,
     lora_task_type       = TaskType.CAUSAL_LM,
     lora_target_modules  = ["q_proj", "k_proj", "v_proj", "o_proj"],
+    # head will be unfreezed automatically
+    lora_modules_to_save = None, 
     # Quantization
     # ---------------------------------------------------------------------------------------------
     load_in_8bit         = False,
@@ -106,12 +110,14 @@ policy_model_config = ModelConfig(
 value_model_config = ModelConfig(
     # LoRA
     # ---------------------------------------------------------------------------------------------
-    use_peft            = True,
-    lora_r              = 8,
-    lora_alpha          = 16,
-    lora_dropout        = 0.0,
-    lora_task_type      = TaskType.SEQ_CLS,
-    lora_target_modules = ["q_proj", "k_proj", "v_proj", "o_proj"],
+    use_peft             = True,
+    lora_r               = 8,
+    lora_alpha           = 16,
+    lora_dropout         = 0.0,
+    lora_task_type       = TaskType.SEQ_CLS,
+    lora_target_modules  = ["q_proj", "k_proj", "v_proj", "o_proj"],
+    # Head will be unfreezed automatically
+    lora_modules_to_save = None,
     # Quantization
     # ---------------------------------------------------------------------------------------------
     load_in_8bit        = False,
@@ -127,7 +133,8 @@ reward_model_config = ModelConfig(
     load_in_4bit        = False,
 )
 
-### PPO Trainer
+# PPO Trainer
+# =================================================================================================
 ppo_config = PPOConfig(
     # Common
     # ---------------------------------------------------------------------------------------------
@@ -142,7 +149,7 @@ ppo_config = PPOConfig(
     gradient_accumulation_steps = 8,
     num_train_epochs    = 1,
     response_length     = 512,
-    stop_token          = "eos",
+    stop_token          = "eos", # use "EOS trick" from N+ PPO impl. details
     # Logging
     # ---------------------------------------------------------------------------------------------
     save_steps          = 160, 
@@ -150,25 +157,34 @@ ppo_config = PPOConfig(
     # ---------------------------------------------------------------------------------------------
     push_to_hub         = True,
     hub_model_id        = f"RLHF-And-Friends/{EXP_NAME}",
+
     # On-policy params
     # ---------------------------------------------------------------------------------------------
-    missing_eos_penalty = 0.0,
+    missing_eos_penalty = 1.0, # 1.0 is recommended in N+ PPO impl. details
     local_rollout_forward_batch_size = 1,
-    # PPO params
+
+    # PPO params (all parameters below are recommended by N+ PPO impl. details)
     # ---------------------------------------------------------------------------------------------
-    num_ppo_epochs      = 1,
-    whiten_rewards      = False,
-    kl_coef             = 0.05,
-    cliprange           = 0.2,
-    vf_coef             = 0.1,
-    cliprange_value     = 0.2,
-    gamma               = 1.0,
-    lam                 = 0.95,
+    num_ppo_epochs      = 4,
+    # reward normalization over batch 
+    # (requires per_device_train_batch_size * gradient_accumulation_steps >= 8)
+    whiten_rewards      = True,
+    kl_coef             = 0.05, # KL penalty coef
+    cliprange           = 0.2, # policy clipping coef
+    cliprange_value     = 0.2, # VF clipping coef
+    vf_coef             = 0.1, # VF coef in total loss
+    gamma               = 1.0, # discount factor
+    lam                 = 0.95, # for GAE
 )
 
 
+###################################################################################################
+# TOKENIZER & MODELS
+###################################################################################################
+
 # Tokenizer
 # =================================================================================================
+
 tokenizer = AutoTokenizer.from_pretrained(
     policy_model_config.model_name_or_path,
     use_fast     = True,
@@ -185,7 +201,6 @@ if tokenizer.pad_token is None:
 # -------------------------------------------------------------------------------------------------
 sft_policy = AutoModelForCausalLM.from_pretrained(
     policy_model_config.model_name_or_path,
-    use_cache = True,
 )
 sft_policy.resize_token_embeddings(len(tokenizer), mean_resizing=False)
 sft_policy.config.pad_token_id = tokenizer.pad_token_id
@@ -199,27 +214,33 @@ policy = get_peft_model(sft_policy, get_peft_config(policy_model_config))
 base_value_head_model = AutoModelForSequenceClassification.from_pretrained(
     policy_model_config.model_name_or_path,
     num_labels = 1,
-    use_cache = True,
 )
 base_value_head_model.resize_token_embeddings(len(tokenizer), mean_resizing=False)
 base_value_head_model.config.pad_token_id = tokenizer.pad_token_id
 
-# Value model
-# -------------------------------------------------------------------------------------------------
-value_model = get_peft_model(
-    base_value_head_model,
-    get_peft_config(value_model_config)
-)
-
 # Reward model
 # -------------------------------------------------------------------------------------------------
+# Load LoRA adapters for reward model
 reward_model = PeftModelForSequenceClassification.from_pretrained(
     base_value_head_model,
     reward_model_config.model_name_or_path,
 )
+# Merge adapters into the model
+reward_model = reward_model.merge_and_unload()
 
-# Data
-# =================================================================================================
+# Value model
+# -------------------------------------------------------------------------------------------------
+# Create value model from reward model as recommended in N+ PPO impl. details
+value_model = get_peft_model(
+    reward_model,
+    get_peft_config(value_model_config)
+)
+
+
+###################################################################################################
+# DATASET
+###################################################################################################
+
 train_dataset = load_dataset(
     DATASET_PATH, 
     split=DATASET_TRAIN_SPLIT
@@ -263,8 +284,10 @@ train_dataset = train_dataset.remove_columns(["prompt", "prompt_id"])
 eval_dataset = eval_dataset.remove_columns(["prompt", "prompt_id"])
 
 
-# Train
-# =================================================================================================
+###################################################################################################
+# TRAINING
+###################################################################################################
+
 def main() -> None:
     trainer = CustomPPOTrainer(
         args              = ppo_config,

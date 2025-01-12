@@ -20,7 +20,7 @@ from trl import (
 )
 
 from fed_ppo.utils import (
-    custom_optimizer, 
+    custom_optimizer,
     apply_chat_template,
     tokenize,
     OptimizerConfig,
@@ -143,10 +143,6 @@ optimizer_config = OptimizerConfig(
 # -------------------------------------------------------------------------------------------------
 quantization_config = get_quantization_config(model_config)
 
-# Use KV-cache or not
-# -------------------------------------------------------------------------------------------------
-use_cache = False if training_args.gradient_checkpointing else True
-
 # Set model type
 # -------------------------------------------------------------------------------------------------
 
@@ -160,8 +156,6 @@ model = AutoModelForSequenceClassification.from_pretrained(
     num_labels = 1,
     quantization_config = quantization_config,
     device_map = "auto",
-    use_cache = use_cache,
-    trust_remote_code = True,
     torch_dtype = torch_dtype
 )
 if model_config.load_in_4bit or model_config.load_in_8bit:
@@ -174,6 +168,11 @@ if model_config.load_in_4bit or model_config.load_in_8bit:
 # -------------------------------------------------------------------------------------------------
 lora_config = get_peft_config(model_config)
 model = get_peft_model(model, lora_config)
+
+print(model)
+
+for name, param in model.named_parameters():
+    print(f"{name}: {param.dtype}")
 
 # Tokenizer
 # =================================================================================================
@@ -203,10 +202,6 @@ model.config.pad_token_id = tokenizer.pad_token_id
 # -------------------------------------------------------------------------------------------------
 quantization_config = get_quantization_config(model_config)
 
-# Use KV-cache or not
-# -------------------------------------------------------------------------------------------------
-use_cache = False if training_args.gradient_checkpointing else True
-
 # Set model type
 # -------------------------------------------------------------------------------------------------
 
@@ -220,8 +215,6 @@ model = AutoModelForSequenceClassification.from_pretrained(
     num_labels = 1,
     quantization_config = quantization_config,
     device_map = "auto",
-    use_cache = use_cache,
-    trust_remote_code = True,
     torch_dtype = torch_dtype
 )
 if model_config.load_in_4bit or model_config.load_in_8bit:
