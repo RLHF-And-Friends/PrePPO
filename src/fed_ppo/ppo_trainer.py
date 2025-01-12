@@ -134,12 +134,15 @@ class CustomPPOTrainer(PPOTrainer):
                 scores = []
                 sequence_lengths = []
                 values = []
-                accelerator.print(f"Trainer {datetime.now().strftime('%H:%M:%S')}: Model Inference")
+                accelerator.print(
+                    f"Trainer {datetime.now().strftime('%H:%M:%S')}: Model Inference. "
+                    f"Effective Batch Size {queries.shape[0]}. "
+                )
                 with unwrap_model_for_generation(model, self.accelerator) as unwrapped_model:
                     query_responses, logitss = batch_generation(
                         unwrapped_model.policy,
                         queries,
-                        args.local_rollout_forward_batch_size,
+                        queries.shape[0],
                         processing_class.pad_token_id,
                         generation_config,
                     )
