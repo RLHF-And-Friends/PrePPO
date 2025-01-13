@@ -136,13 +136,14 @@ class CustomPPOTrainer(PPOTrainer):
                 values = []
                 accelerator.print(
                     f"Trainer {datetime.now().strftime('%H:%M:%S')}: Model Inference. "
-                    f"Effective Batch Size {queries.shape[0]}. "
+                    f"Local Data Batch Size (PPO Epoch Size) {queries.shape[0]}. "
+                    f"Local Rollout Batch Size {args.local_rollout_forward_batch_size}."
                 )
                 with unwrap_model_for_generation(model, self.accelerator) as unwrapped_model:
                     query_responses, logitss = batch_generation(
                         unwrapped_model.policy,
                         queries,
-                        queries.shape[0],
+                        args.local_rollout_forward_batch_size,
                         processing_class.pad_token_id,
                         generation_config,
                     )
