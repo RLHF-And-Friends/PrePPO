@@ -27,7 +27,7 @@ from fed_ppo.utils import (
 )
 
 ###################################################################################################
-# NAMES AND PATHS
+# NAMES & PATHS
 ###################################################################################################
 
 # Model path
@@ -79,7 +79,7 @@ model_config = ModelConfig(
     # Quantization
     # ---------------------------------------------------------------------------------------------
     load_in_8bit         = False,
-    load_in_4bit         = False,
+    load_in_4bit         = True,
     bnb_4bit_quant_type  = "nf4",
     use_bnb_nested_quant = True,
     torch_dtype          = "bfloat16",
@@ -91,18 +91,17 @@ model_config = ModelConfig(
 training_args = RewardConfig(
     # Reward trainer params
     # ---------------------------------------------------------------------------------------------
-    max_length                  = None,
     dataset_num_proc            = 16,
     center_rewards_coefficient  = None,
     # Common
     # ---------------------------------------------------------------------------------------------
     run_name                    = EXP_NAME,
     output_dir                  = f"~/hf/models/{PROJECT_NAME}/{EXP_NAME}",
+    num_train_epochs            = 2,
     per_device_train_batch_size = 4,
     per_device_eval_batch_size  = 4,
-    num_train_epochs            = 2,
-    gradient_checkpointing      = False,
     gradient_accumulation_steps = 4,
+    gradient_checkpointing      = False,
     bf16                        = True,
 
     # Frequency of logs
@@ -127,7 +126,7 @@ optimizer_config = OptimizerConfig(
     optimizer_type = AdamW,
     layer_lr       = {
         "lora":  1e-5, # LoRA adapters
-        "score": 1e-4, # Head
+        "score": 1e-5, # Head
     }
 )
 
@@ -143,10 +142,6 @@ optimizer_config = OptimizerConfig(
 # -------------------------------------------------------------------------------------------------
 quantization_config = get_quantization_config(model_config)
 
-# Use KV-cache or not
-# -------------------------------------------------------------------------------------------------
-use_cache = False if training_args.gradient_checkpointing else True
-
 # Set model type
 # -------------------------------------------------------------------------------------------------
 
@@ -160,10 +155,9 @@ model = AutoModelForSequenceClassification.from_pretrained(
     num_labels = 1,
     quantization_config = quantization_config,
     device_map = "auto",
-    use_cache = use_cache,
-    trust_remote_code = True,
     torch_dtype = torch_dtype
 )
+
 if model_config.load_in_4bit or model_config.load_in_8bit:
     model = prepare_model_for_kbit_training(
         model,
@@ -175,65 +169,9 @@ if model_config.load_in_4bit or model_config.load_in_8bit:
 lora_config = get_peft_config(model_config)
 model = get_peft_model(model, lora_config)
 
-# Tokenizer
-# =================================================================================================
-
-tokenizer = AutoTokenizer.from_pretrained(
-    model_config.model_name_or_path, 
-    use_fast=True
-)
-if tokenizer.pad_token is None:
-    tokenizer.add_special_tokens({"pad_token": "<|pad|>"})
-
-# Sync padding tokens
-# =================================================================================================
-
-model.resize_token_embeddings(len(tokenizer), mean_resizing=False)
-model.config.pad_token_id = tokenizer.pad_token_id
-
-
-###################################################################################################
-# DATASET
-###################################################################################################
-
-# Model
-# =================================================================================================
-
-# Make quantization config
-# -------------------------------------------------------------------------------------------------
-quantization_config = get_quantization_config(model_config)
-
-# Use KV-cache or not
-# -------------------------------------------------------------------------------------------------
-use_cache = False if training_args.gradient_checkpointing else True
-
-# Set model type
-# -------------------------------------------------------------------------------------------------
-
-if model_config.torch_dtype is not None:
-    torch_dtype = getattr(torch, model_config.torch_dtype)
-
-# Create model
-# -------------------------------------------------------------------------------------------------
-model = AutoModelForSequenceClassification.from_pretrained(
-    model_config.model_name_or_path, 
-    num_labels = 1,
-    quantization_config = quantization_config,
-    device_map = "auto",
-    use_cache = use_cache,
-    trust_remote_code = True,
-    torch_dtype = torch_dtype
-)
-if model_config.load_in_4bit or model_config.load_in_8bit:
-    model = prepare_model_for_kbit_training(
-        model,
-        training_args.gradient_checkpointing,
-    )
-
-# Wrap in LoRA
-# -------------------------------------------------------------------------------------------------
-lora_config = get_peft_config(model_config)
-model = get_peft_model(model, lora_config)
+# print(model)
+# for name, parameter in model.named_parameters():
+#     print(f"{name}: {parameter.dtype}")
 
 # Tokenizer
 # =================================================================================================
