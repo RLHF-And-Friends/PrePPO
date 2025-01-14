@@ -1,7 +1,6 @@
 import os
 
 import torch
-from torch.optim import AdamW
 
 from datasets import load_dataset
 
@@ -20,10 +19,9 @@ from trl import (
 )
 
 from fed_ppo.utils import (
-    custom_optimizer, 
     apply_chat_template,
     tokenize,
-    OptimizerConfig,
+    DatasetFormat,
 )
 
 ###################################################################################################
@@ -65,6 +63,7 @@ MAX_LENGTH = 1024
 
 model_config = ModelConfig(
     model_name_or_path   = MODEL_PATH,
+
     # LoRA
     # ---------------------------------------------------------------------------------------------
     use_peft             = True,
@@ -76,6 +75,7 @@ model_config = ModelConfig(
     lora_target_modules  = ["q_proj", "k_proj", "v_proj", "o_proj"],
     # Head will require grad automatically
     lora_modules_to_save = None,
+
     # Quantization
     # ---------------------------------------------------------------------------------------------
     load_in_8bit         = False,
@@ -93,6 +93,7 @@ training_args = RewardConfig(
     # ---------------------------------------------------------------------------------------------
     dataset_num_proc            = 16,
     center_rewards_coefficient  = None,
+
     # Common
     # ---------------------------------------------------------------------------------------------
     run_name                    = EXP_NAME,
@@ -104,30 +105,19 @@ training_args = RewardConfig(
     gradient_checkpointing      = False,
     bf16                        = True,
 
-    # Frequency of logs
+    # Optimizer
+    # ---------------------------------------------------------------------------------------------
+    learning_rate               = 1e-5,
+
+    # Logs
     # ---------------------------------------------------------------------------------------------
     logging_steps               = 20,
-
-    # Evaluation
-    # ---------------------------------------------------------------------------------------------
-    eval_strategy               = "steps",
     eval_steps                  = 100,
 
     # Push to hub after training
     # ---------------------------------------------------------------------------------------------
     push_to_hub                 = False,
     hub_model_id                = f"RLHF-And-Friends/{EXP_NAME}",
-)
-
-# Optimizer config
-# =================================================================================================
-
-optimizer_config = OptimizerConfig(
-    optimizer_type = AdamW,
-    layer_lr       = {
-        "lora":  1e-5, # LoRA adapters
-        "score": 1e-5, # Head
-    }
 )
 
 
@@ -194,40 +184,60 @@ model.config.pad_token_id = tokenizer.pad_token_id
 # DATASET
 ###################################################################################################
 
+# Load dataset
+# =================================================================================================
 dataset = load_dataset(DATASET_PATH)
 
 train_dataset = dataset[DATASET_TRAIN_SPLIT]
 eval_dataset = dataset[DATASET_VAL_SPLIT]
 
-# Apply chat tamplate and tokenize beforehand to avoid doing it inside 
-# the 'RewardTrainer'
-# -------------------------------------------------------------------------------------------------
+# Apply chat tamplate
+# =================================================================================================
 
 train_dataset = train_dataset.map(
     apply_chat_template,
-    fn_kwargs={"tokenizer": tokenizer},
-    load_from_cache_file=False
+    fn_kwargs={
+        "tokenizer": tokenizer,
+        "columns_to_apply_to": ["chosen", "rejected"],
+        "dataset_format": DatasetFormat.CONVERSATIONAL,
+        "add_generation_prompt": False,
+    }
 )
 eval_dataset = eval_dataset.map(
     apply_chat_template,
-    fn_kwargs={"tokenizer": tokenizer},
-    load_from_cache_file = False
+    fn_kwargs={
+        "tokenizer": tokenizer,
+        "columns_to_apply_to": ["chosen", "rejected"],
+        "dataset_format": DatasetFormat.CONVERSATIONAL,
+        "add_generation_prompt": False,
+    }
 )
+
+# Tokenize
+# =================================================================================================
 
 train_dataset = train_dataset.map(
     tokenize,
-    fn_kwargs={"tokenizer": tokenizer},
-    load_from_cache_file = False
+    fn_kwargs={
+        "tokenizer": tokenizer,
+        "columns_to_apply_to": ["chosen", "rejected"],
+        "columns_for_ids": ["input_ids_chosen", "input_ids_rejected"],
+        "columns_for_attn": ["attention_mask_chosen", "attention_mask_rejected"],
+    }
 )
 eval_dataset = eval_dataset.map(
     tokenize,
-    fn_kwargs={"tokenizer": tokenizer},
-    load_from_cache_file = False
+    fn_kwargs={
+        "tokenizer": tokenizer,
+        "columns_to_apply_to": ["chosen", "rejected"],
+        "columns_for_ids": ["input_ids_chosen", "input_ids_rejected"],
+        "columns_for_attn": ["attention_mask_chosen", "attention_mask_rejected"],
+    }
 )
 
 # Filter datasets by length (keep only examples which are no longer then 
 # `max_length` tokens)
-# -------------------------------------------------------------------------------------------------
+# =================================================================================================
 
 length_filter = (
     lambda x: len(x["input_ids_chosen"]) <= MAX_LENGTH
@@ -249,15 +259,12 @@ eval_dataset = eval_dataset.filter(
 # TRAINING
 ###################################################################################################
 
-optimizer = custom_optimizer(model, optimizer_config)
-
 trainer = RewardTrainer(
     model            = model,
     processing_class = tokenizer,
     args             = training_args,
     train_dataset    = train_dataset,
     eval_dataset     = eval_dataset,
-    optimizers       = (optimizer, None)
 )
 
 trainer.train()

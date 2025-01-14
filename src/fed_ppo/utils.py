@@ -1,6 +1,10 @@
 from __future__ import annotations
+
 import typing as tp
+from enum import Enum
+
 import copy
+
 import wandb
 
 from dataclasses import dataclass
@@ -59,71 +63,60 @@ def custom_optimizer(model: nn.Module, config: OptimizerConfig):
 # Prepare dataset
 # -------------------------------------------------------------------------------------------------
 
+class DatasetFormat(str, Enum):
+    PLAIN = "plain",
+    CONVERSATIONAL = "conversational"
+
+
 def apply_chat_template(
     element,
-    tokenizer: PreTrainedTokenizer, 
-    system_prompt: str = None
+    tokenizer: PreTrainedTokenizer,
+    columns_to_apply_to: list[str],
+    dataset_format: DatasetFormat,
+    add_generation_prompt: bool = False,
+    new_columns: list[str] | None = None,
+    system_prompt: str | None = None
 ):
-    # PPO dataset
-    # ---------------------------------------------------------------------------------------------
-    if "prompt" in element.keys():
-        if is_conversational(element):
-            prompt = element["prompt"]
-        elif system_prompt is not None:
-            prompt = [
-                {'role': "system", 'content': system_prompt},
-                {"role": "user", "content": element["prompt"]}
-            ]
-        else:
-            prompt = [
-                {"role": "user", "content": element["prompt"]}
-            ]
-
-        element["prompt"] = tokenizer.apply_chat_template(
+    if new_columns is None:
+        new_columns = columns_to_apply_to
+    
+    for column_name, new_column_name in zip(columns_to_apply_to, new_columns):
+        if dataset_format is DatasetFormat.CONVERSATIONAL:
+            prompt = element[column_name]
+        elif dataset_format is DatasetFormat.PLAIN:
+            if system_prompt is not None:
+                prompt = [
+                    {'role': "system", 'content': system_prompt},
+                    {"role": "user", "content": element[column_name]}
+                ]
+            else:
+                prompt = [
+                    {'role': "user", "content": element[column_name]}
+                ]
+            
+        element[new_column_name] = tokenizer.apply_chat_template(
             prompt,
-            add_generation_prompt = True, # gen prompt is needed
-            tokenize = False,
+            add_generation_prompt=add_generation_prompt,
+            tokenize=False
         )
-
-    # Preference dataset
-    # ---------------------------------------------------------------------------------------------
-    if "chosen" in element.keys() and "rejected" in element.keys():
-        # Apply chat template only if preference dataset is conversational
-        if is_conversational(element):
-            element["chosen"] = tokenizer.apply_chat_template(
-                element["chosen"],
-                add_generation_prompt = False, # do not need gen prompt here
-                tokenize = False,
-            )
-            element["rejected"] = tokenizer.apply_chat_template(
-                element["rejected"],
-                add_generation_prompt = False, # do not need gen prompt here
-                tokenize = False,
-            )
 
     return element
 
 
-def tokenize(element, tokenizer: PreTrainedTokenizer):
-    # PPO dataset
-    # ---------------------------------------------------------------------------------------------
-    if "prompt" in element.keys():
-        tokenized = tokenizer(element["prompt"], add_special_tokens=False)
-        
-        element["input_ids"] = tokenized["input_ids"]
+def tokenize(
+    element, 
+    tokenizer: PreTrainedTokenizer,
+    columns_to_apply_to: list[str],
+    columns_for_ids: list[str],
+    columns_for_attn: list[str]
+):
+    for column_name, ids_column_name, attn_column_name in zip(
+        columns_to_apply_to, columns_for_ids, columns_for_attn
+    ):
+        tokenized = tokenizer(element[column_name], add_special_tokens=False)
+        element[ids_column_name] = tokenized["input_ids"]
+        element[attn_column_name] = tokenized["attention_mask"]
 
-    # Preference dataset
-    # ---------------------------------------------------------------------------------------------
-    if "chosen" in element.keys() and "rejected" in element.keys():
-        chosen_tokenized = tokenizer(element["chosen"], add_special_tokens=False)
-        rejected_tokenized = tokenizer(element["rejected"], add_special_tokens=False)
-        
-        element["input_ids_chosen"] = chosen_tokenized["input_ids"]
-        element["attention_mask_chosen"] = chosen_tokenized["attention_mask"]
-        element["input_ids_rejected"] = rejected_tokenized["input_ids"]
-        element["attention_mask_rejected"] = rejected_tokenized["attention_mask"]
-        
-    
     return element
 
 

@@ -22,10 +22,9 @@ from trl import (
     get_peft_config,
     get_quantization_config,
 )
-from trl.trainer.utils import peft_module_casting_to_bf16
 
 from fed_ppo.ppo_trainer import CustomPPOTrainer
-from fed_ppo.utils import apply_chat_template, tokenize
+from fed_ppo.utils import apply_chat_template, tokenize, DatasetFormat
 from fed_ppo.prompts import (
     STAY_WITHIN_THE_TOKEN_LIMIT,
 )
@@ -247,6 +246,8 @@ value_model = get_peft_model(
 # DATASET
 ###################################################################################################
 
+# Load dataset
+# =================================================================================================
 
 train_dataset = load_dataset(
     DATASET_PATH,
@@ -258,38 +259,57 @@ eval_dataset = load_dataset(
     split=DATASET_VAL_SPLIT
 ).select(range(640))
 
-train_dataset = train_dataset.remove_columns("messages")
-eval_dataset = eval_dataset.remove_columns("messages")
+# Apply chat template
+# =================================================================================================
 
 train_dataset = train_dataset.map(
     apply_chat_template,
     fn_kwargs={
         "tokenizer": tokenizer,
+        "columns_to_apply_to": ["prompt"],
+        "dataset_format": DatasetFormat.PLAIN,
+        "add_generation_prompt": True,
         "system_prompt": STAY_WITHIN_THE_TOKEN_LIMIT(512)
-    },
-    load_from_cache_file=False
+    }
 )
 eval_dataset = eval_dataset.map(
     apply_chat_template,
     fn_kwargs={
         "tokenizer": tokenizer,
-    },
-    load_from_cache_file=False
+        "columns_to_apply_to": ["prompt"],
+        "dataset_format": DatasetFormat.PLAIN,
+        "add_generation_prompt": True,
+        "system_prompt": STAY_WITHIN_THE_TOKEN_LIMIT(512)
+    }
 )
+
+# Tokenize
+# =================================================================================================
 
 train_dataset = train_dataset.map(
     tokenize,
-    fn_kwargs={"tokenizer": tokenizer},
-    load_from_cache_file=False
+    fn_kwargs={
+        "tokenizer": tokenizer,
+        "columns_to_apply_to": ["prompt"],
+        "columns_for_ids": ["input_ids"],
+        "columns_for_attn": ["attention_mask"] # not really used here
+    }
 )
 eval_dataset = eval_dataset.map(
     tokenize,
-    fn_kwargs={"tokenizer": tokenizer},
-    load_from_cache_file=False
+    fn_kwargs={
+        "tokenizer": tokenizer,
+        "columns_to_apply_to": ["prompt"],
+        "columns_for_ids": ["input_ids"],
+        "columns_for_attn": ["attention_mask"] # not really used here
+    }
 )
 
-train_dataset = train_dataset.remove_columns(["prompt", "prompt_id"])
-eval_dataset = eval_dataset.remove_columns(["prompt", "prompt_id"])
+# Remove unnecessary columns
+# =================================================================================================
+
+train_dataset = train_dataset.remove_columns(["prompt", "prompt_id", "messages"])
+eval_dataset = eval_dataset.remove_columns(["prompt", "prompt_id", "messages"])
 
 
 ###################################################################################################
