@@ -7,6 +7,7 @@ from transformers import (
     AutoModelForCausalLM,
     AutoModelForSequenceClassification,
     AutoTokenizer,
+    DataCollatorWithPadding
 )
 
 from peft import (
@@ -85,6 +86,8 @@ os.environ["WANDB_ENTITY"] = "RADFAN"
 ###################################################################################################
 # Configs
 ###################################################################################################
+
+PROMPT_MAX_LENGTH = 512
 
 # Policy
 # =================================================================================================
@@ -270,7 +273,7 @@ train_dataset = train_dataset.map(
         "dataset_format": DatasetFormat.PLAIN,
         "add_generation_prompt": True,
         "system_prompt": STAY_WITHIN_THE_TOKEN_LIMIT(512)
-    }
+    },
 )
 eval_dataset = eval_dataset.map(
     apply_chat_template,
@@ -280,7 +283,7 @@ eval_dataset = eval_dataset.map(
         "dataset_format": DatasetFormat.PLAIN,
         "add_generation_prompt": True,
         "system_prompt": STAY_WITHIN_THE_TOKEN_LIMIT(512)
-    }
+    },
 )
 
 # Tokenize
@@ -293,7 +296,8 @@ train_dataset = train_dataset.map(
         "columns_to_apply_to": ["prompt"],
         "columns_for_ids": ["input_ids"],
         "columns_for_attn": ["attention_mask"] # not really used here
-    }
+    },
+    batched = True
 )
 eval_dataset = eval_dataset.map(
     tokenize,
@@ -302,7 +306,33 @@ eval_dataset = eval_dataset.map(
         "columns_to_apply_to": ["prompt"],
         "columns_for_ids": ["input_ids"],
         "columns_for_attn": ["attention_mask"] # not really used here
-    }
+    },
+    batched = True
+)
+
+# Filter prompts by length
+# =================================================================================================
+
+length_filter = (
+    lambda x: len(x["input_ids"]) <= PROMPT_MAX_LENGTH)
+
+train_dataset = train_dataset.filter(
+    length_filter,
+    num_proc=ppo_config.dataset_num_proc,
+)
+
+eval_dataset = eval_dataset.filter(
+    length_filter,
+    num_proc=ppo_config.dataset_num_proc
+)
+
+# Create data collator with padding
+# =================================================================================================
+
+data_collator = DataCollatorWithPadding(
+    tokenizer = tokenizer,
+    padding = "max_length",
+    max_length = PROMPT_MAX_LENGTH,
 )
 
 # Remove unnecessary columns
@@ -328,6 +358,7 @@ def main() -> None:
         value_model       = value_model,
         train_dataset     = train_dataset,
         eval_dataset      = eval_dataset,
+        data_collator     = data_collator,
     )
     trainer.train()
 
