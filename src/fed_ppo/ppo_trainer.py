@@ -11,6 +11,7 @@ import torch.nn.functional as F
 
 from collections import defaultdict
 from datetime import datetime
+from tqdm import tqdm
 
 from accelerate.utils import gather_object
 
@@ -45,7 +46,6 @@ class CustomPPOTrainer(PPOTrainer):
         """
         Regular init with no cumbersome run renaming.
         """
-
         super().__init__(*args, **kwargs)
 
         if hasattr(self.args, "exp_name"):
@@ -82,7 +82,7 @@ class CustomPPOTrainer(PPOTrainer):
         )
 
         start_time = time.time()
-        accelerator.print(f"Trainer {datetime.now().strftime('%H:%M:%S')}: Started")
+        accelerator.print(f"[{datetime.now().strftime('%H:%M:%S')} Trainer] Started")
         stats_shape = (args.num_ppo_epochs, args.num_mini_batches, args.gradient_accumulation_steps)
         approxkl_stats = torch.zeros(stats_shape, device=device)
         pg_clipfrac_stats = torch.zeros(stats_shape, device=device)
@@ -135,8 +135,8 @@ class CustomPPOTrainer(PPOTrainer):
                 sequence_lengths = []
                 values = []
                 accelerator.print(
-                    f"Trainer {datetime.now().strftime('%H:%M:%S')}: Model Inference. "
-                    f"Local Data Batch Size (PPO Epoch Size) {queries.shape[0]}. "
+                    f"[{datetime.now().strftime('%H:%M:%S')} Trainer] Model Inference. "
+                    f"Local Data Batch Shape {queries.shape[0]}x{queries.shape[1]}. "
                     f"Local Rollout Batch Size {args.local_rollout_forward_batch_size}."
                 )
                 with unwrap_model_for_generation(model, self.accelerator) as unwrapped_model:
@@ -148,7 +148,7 @@ class CustomPPOTrainer(PPOTrainer):
                         generation_config,
                     )
 
-                accelerator.print(f"Trainer {datetime.now().strftime('%H:%M:%S')}: Rollout Processing")
+                accelerator.print(f"[{datetime.now().strftime('%H:%M:%S')} Trainer] Rollout Processing")
                 for i in range(0, queries.shape[0], args.local_rollout_forward_batch_size):
                     query = queries[i : i + args.local_rollout_forward_batch_size]
                     query_response = query_responses[i : i + args.local_rollout_forward_batch_size]
@@ -253,7 +253,7 @@ class CustomPPOTrainer(PPOTrainer):
                 torch.cuda.empty_cache()
 
             # Do multiple epochs of PPO training, with a fresh random shuffle in each epoch
-            accelerator.print(f"Trainer {datetime.now().strftime('%H:%M:%S')}: PPO Step")
+            accelerator.print(f"[{datetime.now().strftime('%H:%M:%S')} Trainer] PPO Step")
             for ppo_epoch_idx in range(args.num_ppo_epochs):
                 b_inds = np.random.permutation(args.local_batch_size)
                 minibatch_idx = 0
@@ -261,7 +261,10 @@ class CustomPPOTrainer(PPOTrainer):
                     mini_batch_end = mini_batch_start + args.local_mini_batch_size
                     mini_batch_inds = b_inds[mini_batch_start:mini_batch_end]
                     gradient_accumulation_idx = 0
-                    for micro_batch_start in range(0, args.local_mini_batch_size, args.per_device_train_batch_size):
+                    for micro_batch_start in tqdm(
+                            range(0, args.local_mini_batch_size, args.per_device_train_batch_size),
+                            disable = not accelerator.is_main_process
+                    ):
                         with accelerator.accumulate(model):
                             micro_batch_end = micro_batch_start + args.per_device_train_batch_size
                             micro_batch_inds = mini_batch_inds[micro_batch_start:micro_batch_end]
@@ -335,7 +338,7 @@ class CustomPPOTrainer(PPOTrainer):
                     # fmt: on
                     torch.cuda.empty_cache()
 
-            accelerator.print(f"Trainer {datetime.now().strftime('%H:%M:%S')}: Gather Metrics")
+            accelerator.print(f"[{datetime.now().strftime('%H:%M:%S')} Trainer] Gather Metrics")
             with torch.no_grad():
                 mean_kl = kl.sum(1).mean()
                 mean_entropy = (-logprobs).sum(1).mean()
@@ -397,7 +400,7 @@ class CustomPPOTrainer(PPOTrainer):
             )
             torch.cuda.empty_cache()
 
-        accelerator.print(f"Trainer {datetime.now().strftime('%H:%M:%S')}: Finished")
+        accelerator.print(f"[{datetime.now().strftime('%H:%M:%S')} Trainer] Finished")
         # HF trainer specifics
         self.control = self.callback_handler.on_train_end(args, self.state, self.control)
         if self.control.should_save:

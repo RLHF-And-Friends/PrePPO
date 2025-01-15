@@ -14,7 +14,7 @@ from peft import (
     PeftModelForSequenceClassification,
     TaskType,
     get_peft_model,
-    prepare_model_for_kbit_training,
+    # prepare_model_for_kbit_training,
 )
 
 from trl import (
@@ -82,6 +82,11 @@ EXP_NAME = f"{POLICY_NAME}-Q4-4xA4000-16GB-BatchSize-64-MaxTok-512"
 os.environ["WANDB_PROJECT"] = PROJECT_NAME
 os.environ["WANDB_ENTITY"] = "RADFAN"
 
+# PyTorch
+# =================================================================================================
+# alleviates cuda memory segmenation and allows to train with larger effecitve
+# batch sizes with no eventual CUDA out of memory errors
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 ###################################################################################################
 # Configs
@@ -110,7 +115,7 @@ policy_model_config = ModelConfig(
     use_bnb_nested_quant = True,
 )
 
-# Value model
+# Value mode4
 # =================================================================================================
 value_model_config = ModelConfig(
     # LoRA
@@ -151,8 +156,8 @@ ppo_config = PPOConfig(
     num_mini_batches                = 1, # batches in ppo epoch
     per_device_train_batch_size     = 1, # \
                                          #  > effective local ppo batch size
-    gradient_accumulation_steps     = 8, # /
-    local_rollout_forward_batch_size= 8, # response generation and processing batch size
+    gradient_accumulation_steps     = 12,# /
+    local_rollout_forward_batch_size= 64,# response generation and processing batch size
     # per_device_eval_batch_size  = 1,
     num_train_epochs    = 1,
     response_length     = 512,
