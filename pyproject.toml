@@ -28,3 +28,12 @@ dependencies = [
 	# evaluation judge
 	"openai"
 ]
+
+[tool.ruff]
+line-length = 99
+
+[tool.ruff.lint]
+select = [
+	"E", "W", # pycodestyle rule set
+	"F", # pyflakes rule set
+]
