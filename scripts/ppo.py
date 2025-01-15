@@ -87,7 +87,7 @@ os.environ["WANDB_ENTITY"] = "RADFAN"
 # Configs
 ###################################################################################################
 
-PROMPT_MAX_LENGTH = 512
+PROMPT_MAX_LENGTH = 1024
 
 # Policy
 # =================================================================================================
@@ -313,16 +313,16 @@ eval_dataset = eval_dataset.map(
 # Filter prompts by length
 # =================================================================================================
 
-length_filter = (
-    lambda x: len(x["input_ids"]) <= PROMPT_MAX_LENGTH)
+def len_filter(x) -> bool:
+    return len(x["input_ids"]) <= PROMPT_MAX_LENGTH
 
 train_dataset = train_dataset.filter(
-    length_filter,
+    len_filter,
     num_proc=ppo_config.dataset_num_proc,
 )
 
 eval_dataset = eval_dataset.filter(
-    length_filter,
+    len_filter,
     num_proc=ppo_config.dataset_num_proc
 )
 
