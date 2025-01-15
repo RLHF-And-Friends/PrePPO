@@ -269,7 +269,4 @@ trainer = RewardTrainer(
 
 trainer.train()
 
-# Remove added pad token from model's embedding layer
-model.resize_token_embeddings(len(tokenizer) - 1)
-
 trainer.push_to_hub(dataset_name=DATASET_PATH)

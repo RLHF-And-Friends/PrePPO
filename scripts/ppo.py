@@ -336,7 +336,3 @@ def main() -> None:
 # =================================================================================================
 if __name__ == "__main__":
     main()
-
-# Quite hard to do as the model is saved in inside the trainer
-# Remove added pad token from model's embedding layer
-# policy.resize_token_embeddings(len(tokenizer) - 1)
