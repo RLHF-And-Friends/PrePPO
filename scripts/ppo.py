@@ -80,8 +80,8 @@ DATASET_NAME        = DATASET_PATH.split('/')[1]
 
 # Project name
 # =================================================================================================
-PROJECT_NAME = "Distributed-PPO"
-EXP_NAME = f"{POLICY_NAME}-4xA4000-NormRM-Q4-LoRA-8-Batch-48-TokIO-960-512"
+PROJECT_NAME = "PPO-NormRM"
+EXP_NAME = f"{POLICY_NAME}-Q4-LoRA8-Batch-3x16-TokIO-960-512"
 
 # WandB
 # =================================================================================================
