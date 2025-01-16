@@ -4,9 +4,9 @@ import torch
 from datasets import load_dataset
 
 from transformers import (
-    AutoModelForCausalLM,
-    AutoModelForSequenceClassification,
-    AutoTokenizer,
+    LlamaForCausalLM,
+    LlamaForSequenceClassification,
+    PreTrainedTokenizerFast,
     DataCollatorWithPadding
 )
 
@@ -25,7 +25,13 @@ from trl import (
 )
 
 from fed_ppo.ppo_trainer import CustomPPOTrainer
-from fed_ppo.utils import apply_chat_template, tokenize, DatasetFormat
+from fed_ppo.utils import (
+    apply_chat_template,
+    tokenize,
+    DatasetFormat,
+    set_bias
+)
+
 from fed_ppo.prompts import (
     STAY_WITHIN_THE_TOKEN_LIMIT,
 )
@@ -62,7 +68,7 @@ POLICY_NAME = POLICY_PATH.split('/')[1]
 
 # Reward model path
 # =================================================================================================
-REWARD_PATH = "RLHF-And-Friends/Llama-3.2-1B-Instruct-Reward-Ultrafeedback"
+REWARD_PATH = "RLHF-And-Friends/Llama-3.2-1B-Instruct-Reward-Ultrafeedback-QLoRA-Normalized"
 REWARD_NAME = REWARD_PATH.split('/')[1]
 
 # Dataset path
@@ -109,7 +115,7 @@ policy_model_config = ModelConfig(
     lora_target_modules  = ["q_proj", "k_proj", "v_proj", "o_proj"],
     # Quantization
     # ---------------------------------------------------------------------------------------------
-    torch_dtype          = "bfloat16", # fallback if no quantization
+    torch_dtype          = "bfloat16",
     load_in_8bit         = False,
     load_in_4bit         = True,
     bnb_4bit_quant_type  = "nf4",
@@ -129,7 +135,7 @@ value_model_config = ModelConfig(
     lora_target_modules = ["q_proj", "k_proj", "v_proj", "o_proj"],
     # Quantization
     # ---------------------------------------------------------------------------------------------
-    torch_dtype         = "bfloat16", # fallback if no quantization
+    torch_dtype         = "bfloat16",
     load_in_8bit        = False,
     load_in_4bit        = True,
     bnb_4bit_quant_type  = "nf4",
@@ -195,21 +201,18 @@ ppo_config = PPOConfig(
 
 # Tokenizer
 # =================================================================================================
-tokenizer = AutoTokenizer.from_pretrained(
+tokenizer = PreTrainedTokenizerFast.from_pretrained(
     policy_model_config.model_name_or_path,
-    use_fast     = True,
-    padding_side = "left"
+    padding_side = "left",
+    pad_token = "<|pad|>",
 )
-if tokenizer.pad_token is None:
-    tokenizer.add_special_tokens({"pad_token": "<|pad|>"})
-
 
 # Models
 # =================================================================================================
 
 # SFT
 # -------------------------------------------------------------------------------------------------
-sft_policy = AutoModelForCausalLM.from_pretrained(
+sft_policy = LlamaForCausalLM.from_pretrained(
     policy_model_config.model_name_or_path,
     quantization_config=get_quantization_config(policy_model_config),
     torch_dtype=getattr(torch, policy_model_config.torch_dtype)
@@ -223,12 +226,20 @@ policy = get_peft_model(sft_policy, get_peft_config(policy_model_config))
 
 # Shared model for Value and Reward
 # -------------------------------------------------------------------------------------------------
-base_value_head_model = AutoModelForSequenceClassification.from_pretrained(
+base_value_head_model = LlamaForSequenceClassification.from_pretrained(
     policy_model_config.model_name_or_path,
     num_labels=1,
     quantization_config=get_quantization_config(value_model_config),
     torch_dtype=getattr(torch, value_model_config.torch_dtype)
 )
+# Add bias to the model head since LlamaForSequenceCLassification does not do it
+set_bias(
+    base_value_head_model, 
+    "score", 
+    bias=0.0, 
+    dtype=getattr(torch, value_model_config.torch_dtype)
+)
+
 base_value_head_model.resize_token_embeddings(len(tokenizer), mean_resizing=False)
 base_value_head_model.config.pad_token_id = tokenizer.pad_token_id
 
@@ -239,15 +250,14 @@ reward_model = PeftModelForSequenceClassification.from_pretrained(
     base_value_head_model,
     reward_model_config.model_name_or_path,
 )
-# Merge adapters into the model
-reward_model = reward_model.merge_and_unload()
 
 # Value model
 # -------------------------------------------------------------------------------------------------
 # Create value model from reward model as recommended in N+ PPO impl. details
-value_model = get_peft_model(
-    reward_model,
-    get_peft_config(value_model_config)
+value_model = PeftModelForSequenceClassification.from_pretrained(
+    base_value_head_model,
+    reward_model_config.model_name_or_path,
+    is_trainable = True
 )
 
 

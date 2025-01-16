@@ -69,7 +69,6 @@ model_config = ModelConfig(
 tokenizer = PreTrainedTokenizerFast.from_pretrained(
     REWARD_ADAPTER_PATH, 
     use_fast=True,
-    use_default_system_prompt = False,
     pad_token = "<|pad|>"
 )
 
@@ -120,7 +119,7 @@ dataset = load_dataset(
     NORM_DATASET_PATH
 )[NORM_DATASET_SPLIT]
 
-dataset = dataset.select(range(100))
+dataset = dataset.select(range(10000))
 
 # Apply chat template
 # =================================================================================================

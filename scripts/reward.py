@@ -132,7 +132,6 @@ training_args = RewardConfig(
 tokenizer = PreTrainedTokenizerFast.from_pretrained(
     model_config.model_name_or_path,
     pad_token = "<|pad|>",
-    use_default_system_prompt = False,
 )
 
 # Model
