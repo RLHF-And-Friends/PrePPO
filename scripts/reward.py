@@ -5,7 +5,7 @@ import torch
 from datasets import load_dataset
 
 from transformers import (
-    LlamaForSequenceClassification, LlamaTokenizer
+    LlamaForSequenceClassification, PreTrainedTokenizerFast
 )
 
 from peft import get_peft_model, TaskType, prepare_model_for_kbit_training
@@ -112,6 +112,7 @@ training_args = RewardConfig(
     # Logs
     # ---------------------------------------------------------------------------------------------
     logging_steps               = 20,
+    eval_strategy               = "steps",
     eval_steps                  = 100,
 
     # Push to hub after training
@@ -128,10 +129,10 @@ training_args = RewardConfig(
 # Tokenizer
 # =================================================================================================
 
-tokenizer = LlamaTokenizer.from_pretrained(
-    model_config.model_name_or_path, 
-    use_fast=True,
-    pad_token = "<|pad|>"
+tokenizer = PreTrainedTokenizerFast.from_pretrained(
+    model_config.model_name_or_path,
+    pad_token = "<|pad|>",
+    use_default_system_prompt = False,
 )
 
 # Model
@@ -144,8 +145,7 @@ quantization_config = get_quantization_config(model_config)
 # Set model type
 # -------------------------------------------------------------------------------------------------
 
-if model_config.torch_dtype is not None:
-    torch_dtype = getattr(torch, model_config.torch_dtype)
+torch_dtype = getattr(torch, model_config.torch_dtype)
 
 # Create model
 # -------------------------------------------------------------------------------------------------

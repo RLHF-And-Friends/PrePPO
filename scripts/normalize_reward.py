@@ -7,9 +7,8 @@ from datasets import load_dataset
 
 from transformers import (
     LlamaForSequenceClassification,
-    LlamaTokenizer,
+    PreTrainedTokenizerFast,
     DataCollatorWithPadding,
-    AutoTokenizer,
 )
 
 from peft import PeftModelForSequenceClassification
@@ -67,7 +66,7 @@ model_config = ModelConfig(
 # Tokenizer
 # =================================================================================================
 
-tokenizer = AutoTokenizer.from_pretrained(
+tokenizer = PreTrainedTokenizerFast.from_pretrained(
     REWARD_ADAPTER_PATH, 
     use_fast=True,
     use_default_system_prompt = False,
