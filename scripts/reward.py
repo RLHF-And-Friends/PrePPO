@@ -125,6 +125,15 @@ training_args = RewardConfig(
 # TOKENIZER & MODELS
 ###################################################################################################
 
+# Tokenizer
+# =================================================================================================
+
+tokenizer = AutoTokenizer.from_pretrained(
+    model_config.model_name_or_path, 
+    use_fast=True,
+    pad_token = "<|pad|>"
+)
+
 # Model
 # =================================================================================================
 
@@ -145,7 +154,7 @@ model = AutoModelForSequenceClassification.from_pretrained(
     num_labels = 1,
     quantization_config = quantization_config,
     device_map = "auto",
-    torch_dtype = torch_dtype
+    torch_dtype = torch_dtype,
 )
 
 if model_config.load_in_4bit or model_config.load_in_8bit:
@@ -154,30 +163,16 @@ if model_config.load_in_4bit or model_config.load_in_8bit:
         training_args.gradient_checkpointing,
     )
 
+# Add padding token
+# -------------------------------------------------------------------------------------------------
+
+model.resize_token_embeddings(len(tokenizer), mean_resizing=False)
+model.config.pad_token_id = tokenizer.pad_token_id
+
 # Wrap in LoRA
 # -------------------------------------------------------------------------------------------------
 lora_config = get_peft_config(model_config)
 model = get_peft_model(model, lora_config)
-
-# print(model)
-# for name, parameter in model.named_parameters():
-#     print(f"{name}: {parameter.dtype}")
-
-# Tokenizer
-# =================================================================================================
-
-tokenizer = AutoTokenizer.from_pretrained(
-    model_config.model_name_or_path, 
-    use_fast=True
-)
-if tokenizer.pad_token is None:
-    tokenizer.add_special_tokens({"pad_token": "<|pad|>"})
-
-# Sync padding tokens
-# =================================================================================================
-
-model.resize_token_embeddings(len(tokenizer), mean_resizing=False)
-model.config.pad_token_id = tokenizer.pad_token_id
 
 
 ###################################################################################################
@@ -201,7 +196,8 @@ train_dataset = train_dataset.map(
         "columns_to_apply_to": ["chosen", "rejected"],
         "dataset_format": DatasetFormat.CONVERSATIONAL,
         "add_generation_prompt": False,
-    }
+    },
+    batched = True
 )
 eval_dataset = eval_dataset.map(
     apply_chat_template,
@@ -210,7 +206,8 @@ eval_dataset = eval_dataset.map(
         "columns_to_apply_to": ["chosen", "rejected"],
         "dataset_format": DatasetFormat.CONVERSATIONAL,
         "add_generation_prompt": False,
-    }
+    },
+    batched = True
 )
 
 # Tokenize
@@ -223,7 +220,8 @@ train_dataset = train_dataset.map(
         "columns_to_apply_to": ["chosen", "rejected"],
         "columns_for_ids": ["input_ids_chosen", "input_ids_rejected"],
         "columns_for_attn": ["attention_mask_chosen", "attention_mask_rejected"],
-    }
+    },
+    batched = True
 )
 eval_dataset = eval_dataset.map(
     tokenize,
@@ -232,7 +230,8 @@ eval_dataset = eval_dataset.map(
         "columns_to_apply_to": ["chosen", "rejected"],
         "columns_for_ids": ["input_ids_chosen", "input_ids_rejected"],
         "columns_for_attn": ["attention_mask_chosen", "attention_mask_rejected"],
-    }
+    },
+    batched = True
 )
 
 # Filter datasets by length (keep only examples which are no longer then 
