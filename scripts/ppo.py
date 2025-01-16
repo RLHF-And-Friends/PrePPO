@@ -81,7 +81,7 @@ DATASET_NAME        = DATASET_PATH.split('/')[1]
 # Project name
 # =================================================================================================
 PROJECT_NAME = "Distributed-PPO"
-EXP_NAME = f"{POLICY_NAME}-4xA4000-Q4-LoRA-8-Batch-48-TokIO-960-512"
+EXP_NAME = f"{POLICY_NAME}-4xA4000-NormRM-Q4-LoRA-8-Batch-48-TokIO-960-512"
 
 # WandB
 # =================================================================================================
@@ -160,10 +160,10 @@ ppo_config = PPOConfig(
     # ppo epoch size = data batch size = effective ppo batch size * num mini batches
     # effecitve ppo batch size = per_dev_tr_bs * grad_acc_st * num_dev
     num_ppo_epochs                  = 1, # num ppo epochs per rollout batch
-    num_mini_batches                = 1, # batches in ppo epoch
+    num_mini_batches                = 3, # batches in ppo epoch
     per_device_train_batch_size     = 1, # \
                                          #  > effective local ppo batch size
-    gradient_accumulation_steps     = 12,# /
+    gradient_accumulation_steps     = 4, # /
     local_rollout_forward_batch_size= 64,# response generation and processing batch size
     # per_device_eval_batch_size  = 1,
     num_train_epochs    = 1,
@@ -171,7 +171,7 @@ ppo_config = PPOConfig(
     stop_token          = "eos",
     # Logging
     # ---------------------------------------------------------------------------------------------
-    save_steps          = 640,
+    save_steps          = 480,
     # Push to hub after training
     # ---------------------------------------------------------------------------------------------
     push_to_hub         = True,
@@ -185,7 +185,7 @@ ppo_config = PPOConfig(
     missing_eos_penalty = 1.0,  # as in N+ PPO implementation details
     # PPO params
     # ---------------------------------------------------------------------------------------------
-    whiten_rewards      = True, # normalize reward in batch
+    whiten_rewards      = False, # normalize reward in batch
     kl_coef             = 0.05,
     cliprange           = 0.2,
     vf_coef             = 0.1,
@@ -234,9 +234,9 @@ base_value_head_model = LlamaForSequenceClassification.from_pretrained(
 )
 # Add bias to the model head since LlamaForSequenceCLassification does not do it
 set_bias(
-    base_value_head_model, 
-    "score", 
-    bias=0.0, 
+    base_value_head_model,
+    "score",
+    bias=0.0,
     dtype=getattr(torch, value_model_config.torch_dtype)
 )
 
