@@ -14,7 +14,7 @@ from peft import (
     PeftModelForSequenceClassification,
     TaskType,
     get_peft_model,
-    prepare_model_for_kbit_training,
+    # prepare_model_for_kbit_training,
 )
 
 from trl import (
@@ -75,19 +75,25 @@ DATASET_NAME        = DATASET_PATH.split('/')[1]
 # Project name
 # =================================================================================================
 PROJECT_NAME = "Distributed-PPO"
-EXP_NAME = f"{POLICY_NAME}-Q4-4xA4000-16GB-BatchSize-64-MaxTok-512"
+EXP_NAME = f"{POLICY_NAME}-4xA4000-Q4-LoRA-8-Batch-48-TokIO-1024-512"
 
 # WandB
 # =================================================================================================
 os.environ["WANDB_PROJECT"] = PROJECT_NAME
 os.environ["WANDB_ENTITY"] = "RADFAN"
 
+# PyTorch
+# =================================================================================================
+# alleviates cuda memory segmenation and allows to train with larger effecitve
+# batch sizes with no eventual CUDA out of memory errors
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 ###################################################################################################
 # Configs
 ###################################################################################################
 
-PROMPT_MAX_LENGTH = 1024
+TOK_IN_MAX = 1024
+TOK_OUT_MAX = 512
 
 # Policy
 # =================================================================================================
@@ -110,7 +116,7 @@ policy_model_config = ModelConfig(
     use_bnb_nested_quant = True,
 )
 
-# Value model
+# Value mode4
 # =================================================================================================
 value_model_config = ModelConfig(
     # LoRA
@@ -151,11 +157,11 @@ ppo_config = PPOConfig(
     num_mini_batches                = 1, # batches in ppo epoch
     per_device_train_batch_size     = 1, # \
                                          #  > effective local ppo batch size
-    gradient_accumulation_steps     = 8, # /
-    local_rollout_forward_batch_size= 8, # response generation and processing batch size
+    gradient_accumulation_steps     = 12,# /
+    local_rollout_forward_batch_size= 64,# response generation and processing batch size
     # per_device_eval_batch_size  = 1,
     num_train_epochs    = 1,
-    response_length     = 512,
+    response_length     = TOK_OUT_MAX,
     stop_token          = "eos",
     # Logging
     # ---------------------------------------------------------------------------------------------
@@ -255,12 +261,12 @@ value_model = get_peft_model(
 train_dataset = load_dataset(
     DATASET_PATH,
     split=DATASET_TRAIN_SPLIT
-).select(range(64000))
+).select(range(48000))
 
 eval_dataset = load_dataset(
     DATASET_PATH,
     split=DATASET_VAL_SPLIT
-).select(range(640))
+).select(range(480))
 
 # Apply chat template
 # =================================================================================================
@@ -272,7 +278,7 @@ train_dataset = train_dataset.map(
         "columns_to_apply_to": ["prompt"],
         "dataset_format": DatasetFormat.PLAIN,
         "add_generation_prompt": True,
-        "system_prompt": STAY_WITHIN_THE_TOKEN_LIMIT(512)
+        "system_prompt": STAY_WITHIN_THE_TOKEN_LIMIT(TOK_OUT_MAX)
     },
 )
 eval_dataset = eval_dataset.map(
@@ -282,7 +288,7 @@ eval_dataset = eval_dataset.map(
         "columns_to_apply_to": ["prompt"],
         "dataset_format": DatasetFormat.PLAIN,
         "add_generation_prompt": True,
-        "system_prompt": STAY_WITHIN_THE_TOKEN_LIMIT(512)
+        "system_prompt": STAY_WITHIN_THE_TOKEN_LIMIT(TOK_OUT_MAX)
     },
 )
 
@@ -314,7 +320,7 @@ eval_dataset = eval_dataset.map(
 # =================================================================================================
 
 def len_filter(x) -> bool:
-    return len(x["input_ids"]) <= PROMPT_MAX_LENGTH
+    return len(x["input_ids"]) <= TOK_IN_MAX
 
 train_dataset = train_dataset.filter(
     len_filter,
@@ -332,7 +338,7 @@ eval_dataset = eval_dataset.filter(
 data_collator = DataCollatorWithPadding(
     tokenizer = tokenizer,
     padding = "max_length",
-    max_length = PROMPT_MAX_LENGTH,
+    max_length = TOK_IN_MAX,
 )
 
 # Remove unnecessary columns
