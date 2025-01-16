@@ -5,7 +5,7 @@ import torch
 from datasets import load_dataset
 
 from transformers import (
-    AutoModelForSequenceClassification, AutoTokenizer
+    LlamaForSequenceClassification, LlamaTokenizer
 )
 
 from peft import get_peft_model, TaskType, prepare_model_for_kbit_training
@@ -128,7 +128,7 @@ training_args = RewardConfig(
 # Tokenizer
 # =================================================================================================
 
-tokenizer = AutoTokenizer.from_pretrained(
+tokenizer = LlamaTokenizer.from_pretrained(
     model_config.model_name_or_path, 
     use_fast=True,
     pad_token = "<|pad|>"
@@ -149,11 +149,10 @@ if model_config.torch_dtype is not None:
 
 # Create model
 # -------------------------------------------------------------------------------------------------
-model = AutoModelForSequenceClassification.from_pretrained(
+model = LlamaForSequenceClassification.from_pretrained(
     model_config.model_name_or_path, 
     num_labels = 1,
     quantization_config = quantization_config,
-    device_map = "auto",
     torch_dtype = torch_dtype,
 )
 
