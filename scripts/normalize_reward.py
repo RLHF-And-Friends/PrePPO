@@ -6,14 +6,22 @@ from torch.utils.data import DataLoader
 from datasets import load_dataset
 
 from transformers import (
-    AutoModelForSequenceClassification, AutoTokenizer, DataCollatorWithPadding
+    LlamaForSequenceClassification,
+    LlamaTokenizer,
+    DataCollatorWithPadding,
+    AutoTokenizer,
 )
 
 from peft import PeftModelForSequenceClassification
 
 from trl import ModelConfig, get_quantization_config
 
-from fed_ppo.utils import apply_chat_template, tokenize, DatasetFormat
+from fed_ppo.utils import (
+    apply_chat_template,
+    tokenize,
+    DatasetFormat,
+    set_bias,
+)
 
 
 ###################################################################################################
@@ -26,7 +34,7 @@ BASE_MODEL_PATH = "meta-llama/Llama-3.2-1B-Instruct"
 
 # Reward adapter path
 # =================================================================================================
-REWARD_ADAPTER_PATH = "RLHF-And-Friends/Llama-3.2-1B-Instruct-Reward-Ultrafeedback-QLoRA-Normalized"
+REWARD_ADAPTER_PATH = "RLHF-And-Friends/Llama-3.2-1B-Instruct-Reward-Ultrafeedback-QLoRA"
 
 # Normalization dataset
 # =================================================================================================
@@ -36,6 +44,7 @@ NORM_DATASET_SPLIT = "train_sft"
 # Normalized adapter path to save
 # =================================================================================================
 NORM_ADAPTER_PATH = "RLHF-And-Friends/Llama-3.2-1B-Instruct-Reward-Ultrafeedback-QLoRA-Normalized"
+
 
 ###################################################################################################
 # CONFIGS
@@ -50,6 +59,7 @@ model_config = ModelConfig(
     
 )
 
+
 ###################################################################################################
 # TOKENIZER & MODELS
 ###################################################################################################
@@ -60,22 +70,32 @@ model_config = ModelConfig(
 tokenizer = AutoTokenizer.from_pretrained(
     REWARD_ADAPTER_PATH, 
     use_fast=True,
+    use_default_system_prompt = False,
+    pad_token = "<|pad|>"
 )
 
 # Model
 # =================================================================================================
 
-device = torch.device("cuda:0")
+device = torch.device("cuda")
 
 quantization_config = get_quantization_config(model_config)
 
-base_model = AutoModelForSequenceClassification.from_pretrained(
-    BASE_MODEL_PATH, 
+base_model = LlamaForSequenceClassification.from_pretrained(
+    BASE_MODEL_PATH,
     num_labels = 1,
     quantization_config = quantization_config,
-    device_map = "auto",
-    torch_dtype = model_config.torch_dtype
+    torch_dtype = getattr(torch, model_config.torch_dtype),
 )
+# Enable bias in the head
+set_bias(
+    base_model, 
+    layer_path="score", 
+    bias=0.0, 
+    dtype=getattr(torch, model_config.torch_dtype)
+)
+
+print(base_model)
 
 model = PeftModelForSequenceClassification.from_pretrained(
     base_model,
@@ -92,6 +112,7 @@ model.resize_token_embeddings(len(tokenizer), mean_resizing=False)
 model.config.pad_token_id = tokenizer.pad_token_id
 
 print(model)
+
 
 ###################################################################################################
 # DATASET
@@ -121,7 +142,6 @@ dataset = dataset.map(
     batched = True
 )
 
-
 # Tokenize
 # =================================================================================================
 
@@ -136,7 +156,6 @@ dataset = dataset.map(
     batched=True
 )
 
-
 # Create dataloader
 # =================================================================================================
 
@@ -147,6 +166,7 @@ dataloader = DataLoader(
     collate_fn=DataCollatorWithPadding(tokenizer),
     shuffle=False
 )
+
 
 ###################################################################################################
 # Normalization
@@ -173,28 +193,21 @@ print(f"Mean reward: {mean_reward}")
 # Add bias to the head and save
 ###################################################################################################
 
-# Add bias
+# Set bias
 # =================================================================================================
 
-# Original head
-original_head = model.score.modules_to_save.default
-
-# New head
-new_layer = torch.nn.Linear(in_features=2048, out_features=1, bias=True)
-
-# Copy weights
-new_layer.weight.data = original_head.weight.data.clone()
-
-new_layer.bias.data = torch.tensor(-mean_reward)
-
-model.score.modules_to_save.default = new_layer
+set_bias(
+    model, 
+    layer_path="score.modules_to_save.default",
+    bias = -mean_reward
+)
 
 # Remove pad token and save
 # =================================================================================================
 
-print(model.score.modules_to_save.default.bias)
-
 model.resize_token_embeddings(len(tokenizer) - 1)
+
+print(f"New bias: {model.score.modules_to_save.default.bias.data}")
 
 model.push_to_hub(NORM_ADAPTER_PATH)
 tokenizer.push_to_hub(NORM_ADAPTER_PATH)

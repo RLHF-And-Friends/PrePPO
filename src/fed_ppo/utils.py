@@ -9,6 +9,7 @@ import wandb
 
 from dataclasses import dataclass
 
+import torch
 from torch import nn
 
 from transformers import PreTrainedTokenizer
@@ -22,7 +23,7 @@ from trl.data_utils import is_conversational
 # =================================================================================================
 
 # Copy and freeze model
-# -------------------------------------------------------------------------------------------------
+# =================================================================================================
 
 def frozen_copy(model: nn.Module) -> nn.Module:
     """
@@ -37,7 +38,7 @@ def frozen_copy(model: nn.Module) -> nn.Module:
 
 
 # Create optimizer with different lerning rates for different parameters (e.g. LoRA and head)
-# -------------------------------------------------------------------------------------------------
+# =================================================================================================
 
 @dataclass
 class OptimizerConfig:
@@ -61,12 +62,15 @@ def custom_optimizer(model: nn.Module, config: OptimizerConfig):
 
 
 # Prepare dataset
-# -------------------------------------------------------------------------------------------------
+# =================================================================================================
 
 class DatasetFormat(str, Enum):
     PLAIN = "plain",
     CONVERSATIONAL = "conversational"
 
+
+# Apply chat template
+# -------------------------------------------------------------------------------------------------
 
 def apply_chat_template(
     element,
@@ -102,6 +106,8 @@ def apply_chat_template(
 
     return element
 
+# Tokenize
+# -------------------------------------------------------------------------------------------------
 
 def tokenize(
     element, 
@@ -118,6 +124,36 @@ def tokenize(
         element[attn_column_name] = tokenized["attention_mask"]
 
     return element
+
+
+# Add bias to a head
+# =================================================================================================
+
+def set_bias(
+    model: nn.Module, 
+    layer_path: str, 
+    bias: float, 
+    dtype: tp.Optional[torch.dtype] = None
+)-> None:
+
+    with torch.no_grad():
+        parts = layer_path.split(".")
+        layer_name = parts[-1]
+        parent = model
+        for part in parts[:-1]:
+            parent = getattr(parent, part)
+
+        # Access the target layer
+        layer = getattr(parent, layer_name)
+        if layer.bias is not None:
+            layer.bias.data.fill_(bias)
+        else:
+            new_layer = nn.Linear(
+                layer.in_features, layer.out_features, bias=True, dtype=dtype
+            )
+            new_layer.weight.data = layer.weight.data.clone()
+            new_layer.bias.data.fill_(bias)
+            setattr(parent, layer_name, new_layer)
 
 
 # =================================================================================================
