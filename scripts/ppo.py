@@ -75,7 +75,7 @@ DATASET_NAME        = DATASET_PATH.split('/')[1]
 # Project name
 # =================================================================================================
 PROJECT_NAME = "Distributed-PPO"
-EXP_NAME = f"{POLICY_NAME}-4xA4000-Q4-LoRA-8-Batch-48-TokIO-1024-512"
+EXP_NAME = f"{POLICY_NAME}-4xA4000-Q4-LoRA-8-Batch-48-TokIO-960-512"
 
 # WandB
 # =================================================================================================
@@ -92,7 +92,7 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 # Configs
 ###################################################################################################
 
-TOK_IN_MAX = 1024
+TOK_IN_MAX = 960
 TOK_OUT_MAX = 512
 
 # Policy
