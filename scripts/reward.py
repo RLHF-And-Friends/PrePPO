@@ -269,4 +269,5 @@ trainer = RewardTrainer(
 
 trainer.train()
 
+model.resize_token_embeddings(len(tokenizer) - 1)
 trainer.push_to_hub(dataset_name=DATASET_PATH)
