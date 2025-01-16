@@ -95,8 +95,6 @@ set_bias(
     dtype=getattr(torch, model_config.torch_dtype)
 )
 
-print(base_model)
-
 model = PeftModelForSequenceClassification.from_pretrained(
     base_model,
     REWARD_ADAPTER_PATH
@@ -110,8 +108,6 @@ model.eval()
 
 model.resize_token_embeddings(len(tokenizer), mean_resizing=False)
 model.config.pad_token_id = tokenizer.pad_token_id
-
-print(model)
 
 
 ###################################################################################################
