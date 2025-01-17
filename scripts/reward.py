@@ -101,9 +101,9 @@ training_args = RewardConfig(
     run_name                    = EXP_NAME,
     output_dir                  = f"~/hf/models/{PROJECT_NAME}/{EXP_NAME}",
     num_train_epochs            = 2,
-    per_device_train_batch_size = 1,
-    per_device_eval_batch_size  = 1,
-    gradient_accumulation_steps = 8,
+    per_device_train_batch_size = 4,
+    per_device_eval_batch_size  = 4,
+    gradient_accumulation_steps = 4,
     gradient_checkpointing      = False,
     bf16                        = True,
 
@@ -115,7 +115,7 @@ training_args = RewardConfig(
     # ---------------------------------------------------------------------------------------------
     logging_steps               = 20,
     eval_strategy               = "steps",
-    eval_steps                  = 100,
+    eval_steps                  = 500,
 
     # Push to hub after training
     # ---------------------------------------------------------------------------------------------
