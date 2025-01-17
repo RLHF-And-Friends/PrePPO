@@ -81,7 +81,7 @@ DATASET_NAME        = DATASET_PATH.split('/')[1]
 # Project name
 # =================================================================================================
 PROJECT_NAME = "PPO-NormRM"
-EXP_NAME = f"{POLICY_NAME}-Q4-LoRA8-Batch-3x16-TokIO-960-512"
+EXP_NAME = f"{POLICY_NAME}-Q4-LoRA8-Batch-3x16-TokIO-960-512-LR-3e-6"
 
 # WandB
 # =================================================================================================
@@ -178,7 +178,7 @@ ppo_config = PPOConfig(
     hub_model_id        = f"RLHF-And-Friends/{EXP_NAME}",
     # Optimizer params
     # ---------------------------------------------------------------------------------------------
-    learning_rate       = 1e-5,
+    learning_rate       = 3e-6,
     adam_epsilon        = 1e-5,
     # On-policy params
     # ---------------------------------------------------------------------------------------------
