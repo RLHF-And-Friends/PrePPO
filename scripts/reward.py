@@ -30,7 +30,7 @@ from fed_ppo.utils import (
 
 # Model path
 # =================================================================================================
-MODEL_PATH = "meta-llama/Llama-3.2-3B-Instruct"
+MODEL_PATH = "meta-llama/Llama-3.1-8B-Instruct"
 MODEL_NAME = MODEL_PATH.split('/')[1]
 
 # Dataset path
