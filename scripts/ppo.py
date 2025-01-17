@@ -32,10 +32,6 @@ from fed_ppo.utils import (
     set_bias
 )
 
-from fed_ppo.prompts import (
-    STAY_WITHIN_THE_TOKEN_LIMIT,
-)
-
 
 """
 Run this script with single-GPU normally with:
@@ -81,7 +77,7 @@ DATASET_NAME        = DATASET_PATH.split('/')[1]
 # Project name
 # =================================================================================================
 PROJECT_NAME = "PPO-NormRM"
-EXP_NAME = f"{POLICY_NAME}-Q4-LoRA8-Batch-3x16-TokIO-960-512-LR-3e-6"
+EXP_NAME = f"{POLICY_NAME}-Q4-LoRA8-Batch-3x16-TokIO-960-512-LR-3e-6-NoSysPrompt"
 
 # WandB
 # =================================================================================================
@@ -288,7 +284,6 @@ train_dataset = train_dataset.map(
         "columns_to_apply_to": ["prompt"],
         "dataset_format": DatasetFormat.PLAIN,
         "add_generation_prompt": True,
-        "system_prompt": STAY_WITHIN_THE_TOKEN_LIMIT(TOK_OUT_MAX)
     },
 )
 eval_dataset = eval_dataset.map(
@@ -298,7 +293,6 @@ eval_dataset = eval_dataset.map(
         "columns_to_apply_to": ["prompt"],
         "dataset_format": DatasetFormat.PLAIN,
         "add_generation_prompt": True,
-        "system_prompt": STAY_WITHIN_THE_TOKEN_LIMIT(TOK_OUT_MAX)
     },
 )
 
