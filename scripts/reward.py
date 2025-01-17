@@ -30,7 +30,7 @@ from fed_ppo.utils import (
 
 # Model path
 # =================================================================================================
-MODEL_PATH = "meta-llama/Llama-3.2-1B-Instruct"
+MODEL_PATH = "meta-llama/Llama-3.2-3B-Instruct"
 MODEL_NAME = MODEL_PATH.split('/')[1]
 
 # Dataset path
@@ -42,8 +42,8 @@ DATASET_NAME        = DATASET_PATH.split('/')[1]
 
 # Project name
 # =================================================================================================
-PROJECT_NAME = f"Reward-Modelling-{MODEL_NAME}-{DATASET_NAME}"
-EXP_NAME = f"LoRA-8r"
+PROJECT_NAME = "RM-UltrafeedbackBinarized"
+EXP_NAME = f"{MODEL_NAME}-Q4-LoRA8-Batch-16-Tok-1024"
 
 # WandB
 # =================================================================================================
@@ -56,7 +56,9 @@ os.environ["WANDB_ENTITY"]  = "RADFAN"
 ###################################################################################################
 
 # Datasets will be filtered according to max length
-MAX_LENGTH = 1024
+TOK_LIM     = 1024
+TRAIN_SIZE  = 62100 # 62.100 MAX
+EVAL_SIZE   = 1000  #  1.000 MAX
 
 # Model config
 # =================================================================================================
@@ -99,9 +101,9 @@ training_args = RewardConfig(
     run_name                    = EXP_NAME,
     output_dir                  = f"~/hf/models/{PROJECT_NAME}/{EXP_NAME}",
     num_train_epochs            = 2,
-    per_device_train_batch_size = 4,
-    per_device_eval_batch_size  = 4,
-    gradient_accumulation_steps = 4,
+    per_device_train_batch_size = 1,
+    per_device_eval_batch_size  = 1,
+    gradient_accumulation_steps = 8,
     gradient_checkpointing      = False,
     bf16                        = True,
 
@@ -117,8 +119,8 @@ training_args = RewardConfig(
 
     # Push to hub after training
     # ---------------------------------------------------------------------------------------------
-    push_to_hub                 = False,
-    hub_model_id                = f"RLHF-And-Friends/{EXP_NAME}",
+    push_to_hub                 = False, # would push manually with pad embedding removed
+    hub_model_id                = f"RLHF-And-Friends/{PROJECT_NAME}-{EXP_NAME}",
 )
 
 
@@ -149,7 +151,7 @@ torch_dtype = getattr(torch, model_config.torch_dtype)
 # Create model
 # -------------------------------------------------------------------------------------------------
 model = LlamaForSequenceClassification.from_pretrained(
-    model_config.model_name_or_path, 
+    model_config.model_name_or_path,
     num_labels = 1,
     quantization_config = quantization_config,
     torch_dtype = torch_dtype,
@@ -181,8 +183,8 @@ model = get_peft_model(model, lora_config)
 # =================================================================================================
 dataset = load_dataset(DATASET_PATH)
 
-train_dataset = dataset[DATASET_TRAIN_SPLIT]
-eval_dataset = dataset[DATASET_VAL_SPLIT]
+train_dataset = dataset[DATASET_TRAIN_SPLIT].select(range(TRAIN_SIZE))
+eval_dataset = dataset[DATASET_VAL_SPLIT].select(range(EVAL_SIZE))
 
 # Apply chat tamplate
 # =================================================================================================
@@ -232,22 +234,20 @@ eval_dataset = eval_dataset.map(
     batched = True
 )
 
-# Filter datasets by length (keep only examples which are no longer then 
+# Filter datasets by length (keep only examples which are no longer then
 # `max_length` tokens)
 # =================================================================================================
 
-length_filter = (
-    lambda x: len(x["input_ids_chosen"]) <= MAX_LENGTH
-              and len(x["input_ids_rejected"]) <= MAX_LENGTH
-)
+def len_filter(x) -> bool:
+    return len(x["input_ids_chosen"]) <= TOK_LIM and len(x["input_ids_rejected"]) <= TOK_LIM
 
 train_dataset = train_dataset.filter(
-    length_filter,
+    len_filter,
     num_proc=training_args.dataset_num_proc,
 )
 
 eval_dataset = eval_dataset.filter(
-    length_filter,
+    len_filter,
     num_proc=training_args.dataset_num_proc,
 )
 
@@ -256,15 +256,23 @@ eval_dataset = eval_dataset.filter(
 # TRAINING
 ###################################################################################################
 
-trainer = RewardTrainer(
-    model            = model,
-    processing_class = tokenizer,
-    args             = training_args,
-    train_dataset    = train_dataset,
-    eval_dataset     = eval_dataset,
-)
+# Train
+# =================================================================================================
+def main() -> None:
+    trainer = RewardTrainer(
+        model            = model,
+        processing_class = tokenizer,
+        args             = training_args,
+        train_dataset    = train_dataset,
+        eval_dataset     = eval_dataset,
+    )
+    trainer.train()
 
-trainer.train()
+    model.resize_token_embeddings(len(tokenizer) - 1)
+    trainer.push_to_hub(dataset_name=DATASET_PATH)
 
-model.resize_token_embeddings(len(tokenizer) - 1)
-trainer.push_to_hub(dataset_name=DATASET_PATH)
+
+# Accelerate entry-point
+# =================================================================================================
+if __name__ == "__main__":
+    main()
