@@ -30,7 +30,7 @@ from fed_ppo.utils import (
 
 # Model path
 # =================================================================================================
-MODEL_PATH = "meta-llama/Llama-3.1-8B-Instruct"
+MODEL_PATH = "meta-llama/Llama-3.2-1B-Instruct"
 MODEL_NAME = MODEL_PATH.split('/')[1]
 
 # Dataset path
@@ -101,9 +101,9 @@ training_args = RewardConfig(
     run_name                    = EXP_NAME,
     output_dir                  = f"~/hf/models/{PROJECT_NAME}/{EXP_NAME}",
     num_train_epochs            = 2,
-    per_device_train_batch_size = 4,
-    per_device_eval_batch_size  = 4,
-    gradient_accumulation_steps = 4,
+    per_device_train_batch_size = 8,
+    per_device_eval_batch_size  = 8,
+    gradient_accumulation_steps = 2,
     gradient_checkpointing      = False,
     bf16                        = True,
 
