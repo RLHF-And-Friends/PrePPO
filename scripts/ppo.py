@@ -64,8 +64,9 @@ POLICY_NAME = POLICY_PATH.split('/')[1]
 
 # Reward model path
 # =================================================================================================
-REWARD_PATH = "RLHF-And-Friends/Llama-3.2-1B-Instruct-Reward-Ultrafeedback-QLoRA-Normalized"
-REWARD_NAME = REWARD_PATH.split('/')[1]
+REWARD_BASE_PATH = "meta-llama/Llama-3.2-3B-Instruct"
+REWARD_ADAPTER_PATH = "RLHF-And-Friends/RM-UltrafeedbackBinarized-Llama-3.2-3B-Instruct-Q4-LoRA8-Batch-16-Tok-1024"
+REWARD_NAME = REWARD_ADAPTER_PATH.split('/')[1]
 
 # Dataset path
 # =================================================================================================
@@ -76,8 +77,8 @@ DATASET_NAME        = DATASET_PATH.split('/')[1]
 
 # Project name
 # =================================================================================================
-PROJECT_NAME = "PPO-NormRM"
-EXP_NAME = f"{POLICY_NAME}-Q4-LoRA8-Batch-3x16-TokIO-960-512-LR-3e-6-NoSysPrompt"
+PROJECT_NAME = "Distributed-PPO"
+EXP_NAME = f"{POLICY_NAME}-Q4-LoRA8-Batch-1x16-TokIO-960-512-LR-3e-6-NoSysPrompt-RM-3B"
 
 # WandB
 # =================================================================================================
@@ -141,7 +142,7 @@ value_model_config = ModelConfig(
 # Reward model
 # =================================================================================================
 reward_model_config = ModelConfig(
-    model_name_or_path  = REWARD_PATH,
+    model_name_or_path  = REWARD_ADAPTER_PATH,
     load_in_8bit        = False,
     load_in_4bit        = False,
 )
@@ -156,7 +157,7 @@ ppo_config = PPOConfig(
     # ppo epoch size = data batch size = effective ppo batch size * num mini batches
     # effecitve ppo batch size = per_dev_tr_bs * grad_acc_st * num_dev
     num_ppo_epochs                  = 1, # num ppo epochs per rollout batch
-    num_mini_batches                = 3, # batches in ppo epoch
+    num_mini_batches                = 1, # batches in ppo epoch
     per_device_train_batch_size     = 1, # \
                                          #  > effective local ppo batch size
     gradient_accumulation_steps     = 4, # /
@@ -223,7 +224,7 @@ policy = get_peft_model(sft_policy, get_peft_config(policy_model_config))
 # Shared model for Value and Reward
 # -------------------------------------------------------------------------------------------------
 base_value_head_model = LlamaForSequenceClassification.from_pretrained(
-    policy_model_config.model_name_or_path,
+    REWARD_BASE_PATH,
     num_labels=1,
     quantization_config=get_quantization_config(value_model_config),
     torch_dtype=getattr(torch, value_model_config.torch_dtype)
