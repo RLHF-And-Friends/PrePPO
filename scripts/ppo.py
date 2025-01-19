@@ -59,12 +59,11 @@ And that's it.
 
 # Policy model path
 # =================================================================================================
-POLICY_PATH = "meta-llama/Llama-3.2-1B-Instruct"
+POLICY_PATH = "meta-llama/Llama-3.2-3B-Instruct"
 POLICY_NAME = POLICY_PATH.split('/')[1]
 
 # Reward model path
 # =================================================================================================
-REWARD_BASE_PATH = "meta-llama/Llama-3.2-3B-Instruct"
 REWARD_ADAPTER_PATH = "RLHF-And-Friends/RM-UltrafeedbackBinarized-Llama-3.2-3B-Instruct-Q4-LoRA8-Batch-16-Tok-1024"
 REWARD_NAME = REWARD_ADAPTER_PATH.split('/')[1]
 
@@ -78,7 +77,7 @@ DATASET_NAME        = DATASET_PATH.split('/')[1]
 # Project name
 # =================================================================================================
 PROJECT_NAME = "Distributed-PPO"
-EXP_NAME = f"{POLICY_NAME}-Q4-LoRA8-Batch-1x16-TokIO-960-512-LR-3e-6-NoSysPrompt-RM-3B"
+EXP_NAME = f"{POLICY_NAME}-Q4-LoRA8-Batch-3x16-TokIO-960-512-LR-3e-6-NoSysPrompt"
 
 # WandB
 # =================================================================================================
@@ -157,10 +156,10 @@ ppo_config = PPOConfig(
     # ppo epoch size = data batch size = effective ppo batch size * num mini batches
     # effecitve ppo batch size = per_dev_tr_bs * grad_acc_st * num_dev
     num_ppo_epochs                  = 1, # num ppo epochs per rollout batch
-    num_mini_batches                = 1, # batches in ppo epoch
+    num_mini_batches                = 3, # batches in ppo epoch
     per_device_train_batch_size     = 1, # \
                                          #  > effective local ppo batch size
-    gradient_accumulation_steps     = 4, # /
+    gradient_accumulation_steps     = 16, # /
     local_rollout_forward_batch_size= 64,# response generation and processing batch size
     # per_device_eval_batch_size  = 1,
     num_train_epochs    = 1,
@@ -224,7 +223,7 @@ policy = get_peft_model(sft_policy, get_peft_config(policy_model_config))
 # Shared model for Value and Reward
 # -------------------------------------------------------------------------------------------------
 base_value_head_model = LlamaForSequenceClassification.from_pretrained(
-    REWARD_BASE_PATH,
+    POLICY_PATH,
     num_labels=1,
     quantization_config=get_quantization_config(value_model_config),
     torch_dtype=getattr(torch, value_model_config.torch_dtype)
