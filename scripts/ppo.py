@@ -59,12 +59,12 @@ And that's it.
 
 # Policy model path
 # =================================================================================================
-POLICY_PATH = "meta-llama/Llama-3.2-3B-Instruct"
+POLICY_PATH = "meta-llama/Llama-3.2-1B-Instruct"
 POLICY_NAME = POLICY_PATH.split('/')[1]
 
 # Reward model path
 # =================================================================================================
-REWARD_ADAPTER_PATH = "RLHF-And-Friends/RM-UltrafeedbackBinarized-Llama-3.2-3B-Instruct-Q4-LoRA8-Batch-16-Tok-1024"
+REWARD_ADAPTER_PATH = "RLHF-And-Friends/RM-UltrafeedbackBinarized-Llama-3.2-1B-Instruct-Q4-LoRA8-Batch-16-Tok-1024"
 REWARD_NAME = REWARD_ADAPTER_PATH.split('/')[1]
 
 # Dataset path
@@ -77,7 +77,7 @@ DATASET_NAME        = DATASET_PATH.split('/')[1]
 # Project name
 # =================================================================================================
 PROJECT_NAME = "Distributed-PPO"
-EXP_NAME = f"{POLICY_NAME}-Q4-LoRA8-Batch-3x16-TokIO-960-512-LR-3e-6-NoSysPrompt"
+EXP_NAME = f"{POLICY_NAME}-Q4-LoRA8-Batch-3x16-TokIO-960-512-LR-1e-4-NoSysPrompt"
 
 # WandB
 # =================================================================================================
@@ -118,7 +118,7 @@ policy_model_config = ModelConfig(
     use_bnb_nested_quant = True,
 )
 
-# Value mode4
+# Value model
 # =================================================================================================
 value_model_config = ModelConfig(
     # LoRA
@@ -174,8 +174,8 @@ ppo_config = PPOConfig(
     hub_model_id        = f"RLHF-And-Friends/{EXP_NAME}",
     # Optimizer params
     # ---------------------------------------------------------------------------------------------
-    learning_rate       = 3e-6,
-    adam_epsilon        = 1e-5,
+    learning_rate       = 1e-4,
+    # adam_epsilon        = 1e-5,
     # On-policy params
     # ---------------------------------------------------------------------------------------------
     missing_eos_penalty = 1.0,  # as in N+ PPO implementation details
