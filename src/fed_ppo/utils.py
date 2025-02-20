@@ -44,7 +44,7 @@ def frozen_copy(model: nn.Module) -> nn.Module:
 class OptimizerConfig:
     optimizer_type: type
     layer_lr: dict[str, float]
-
+    scheduler: type
 
 def custom_optimizer(model: nn.Module, config: OptimizerConfig):
     layer_params = {layer_name: [] for layer_name in config.layer_lr}
@@ -114,15 +114,34 @@ def tokenize(
     tokenizer: PreTrainedTokenizer,
     columns_to_apply_to: list[str],
     columns_for_ids: list[str],
-    columns_for_attn: list[str]
+    columns_for_attn: list[str],
+    add_special_tokens = True,
 ):
     for column_name, ids_column_name, attn_column_name in zip(
         columns_to_apply_to, columns_for_ids, columns_for_attn
     ):
-        tokenized = tokenizer(element[column_name], add_special_tokens=False)
+        tokenized = tokenizer(
+            element[column_name], add_special_tokens=add_special_tokens
+        )
         element[ids_column_name] = tokenized["input_ids"]
         element[attn_column_name] = tokenized["attention_mask"]
 
+    return element
+
+# Cat column contents
+# -------------------------------------------------------------------------------------------------
+
+def cat_columns_contents(
+    element,
+    lhs_column_names: list[str],
+    rhs_column_names: list[str],
+    cat_column_names: list[str]
+):
+    for lhs_column_name, rhs_column_name, cat_column_name in zip(
+        lhs_column_names, rhs_column_names, cat_column_names
+    ):
+        element[cat_column_name] = element[lhs_column_name] + element[rhs_column_name]
+        
     return element
 
 

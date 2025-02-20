@@ -1,11 +1,13 @@
 import os
 
 import torch
+from torch.optim import AdamW
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from datasets import load_dataset
 
 from transformers import (
-    LlamaForSequenceClassification, PreTrainedTokenizerFast
+    AutoModelForSequenceClassification, AutoTokenizer
 )
 
 from peft import get_peft_model, TaskType, prepare_model_for_kbit_training
@@ -19,9 +21,10 @@ from trl import (
 )
 
 from fed_ppo.utils import (
-    apply_chat_template,
     tokenize,
-    DatasetFormat,
+    cat_columns_contents,
+    custom_optimizer,
+    OptimizerConfig,
 )
 
 ###################################################################################################
@@ -30,20 +33,20 @@ from fed_ppo.utils import (
 
 # Model path
 # =================================================================================================
-MODEL_PATH = "meta-llama/Llama-3.2-1B-Instruct"
+MODEL_PATH = "mistral-community/Mistral-7B-v0.2"
 MODEL_NAME = MODEL_PATH.split('/')[1]
 
 # Dataset path
 # =================================================================================================
-DATASET_PATH        = "trl-lib/ultrafeedback_binarized"
+DATASET_PATH        = "trl-lib/tldr-preference"
 DATASET_TRAIN_SPLIT = "train"
-DATASET_VAL_SPLIT   = "test"
+DATASET_VAL_SPLIT   = "validation"
 DATASET_NAME        = DATASET_PATH.split('/')[1]
 
 # Project name
 # =================================================================================================
-PROJECT_NAME = "RM-UltrafeedbackBinarized"
-EXP_NAME = f"{MODEL_NAME}-Q4-LoRA8-Batch-16-Tok-1024"
+PROJECT_NAME = "RM-TLDR"
+EXP_NAME = f"{MODEL_NAME}"
 
 # WandB
 # =================================================================================================
@@ -57,8 +60,8 @@ os.environ["WANDB_ENTITY"]  = "RADFAN"
 
 # Datasets will be filtered according to max length
 TOK_LIM     = 1024
-TRAIN_SIZE  = 62100 # 62.100 MAX
-EVAL_SIZE   = 1000  #  1.000 MAX
+TRAIN_SIZE  = 92858 # 62.100 MAX
+EVAL_SIZE   = 2000  # 1.000 MAX
 
 # Model config
 # =================================================================================================
@@ -71,8 +74,8 @@ model_config = ModelConfig(
     use_peft             = True,
     lora_task_type       = TaskType.SEQ_CLS,
     use_rslora           = False,
-    lora_r               = 8,
-    lora_alpha           = 16,
+    lora_r               = 16,
+    lora_alpha           = 32,
     lora_dropout         = 0.0,
     lora_target_modules  = ["q_proj", "k_proj", "v_proj", "o_proj"],
     # Head will require grad automatically
@@ -81,7 +84,7 @@ model_config = ModelConfig(
     # Quantization
     # ---------------------------------------------------------------------------------------------
     load_in_8bit         = False,
-    load_in_4bit         = True,
+    load_in_4bit         = False,
     bnb_4bit_quant_type  = "nf4",
     use_bnb_nested_quant = True,
     torch_dtype          = "bfloat16",
@@ -100,22 +103,23 @@ training_args = RewardConfig(
     # ---------------------------------------------------------------------------------------------
     run_name                    = EXP_NAME,
     output_dir                  = f"~/hf/models/{PROJECT_NAME}/{EXP_NAME}",
-    num_train_epochs            = 2,
-    per_device_train_batch_size = 8,
-    per_device_eval_batch_size  = 8,
-    gradient_accumulation_steps = 2,
+    num_train_epochs            = 1,
+    per_device_train_batch_size = 4,
+    per_device_eval_batch_size  = 4,
+    gradient_accumulation_steps = 4,
     gradient_checkpointing      = False,
     bf16                        = True,
-
+    
     # Optimizer
     # ---------------------------------------------------------------------------------------------
-    learning_rate               = 1e-5,
+    learning_rate = 3e-6,
+    adam_epsilon  = 1e-5,
 
     # Logs
     # ---------------------------------------------------------------------------------------------
     logging_steps               = 20,
     eval_strategy               = "steps",
-    eval_steps                  = 500,
+    eval_steps                  = 200,
 
     # Push to hub after training
     # ---------------------------------------------------------------------------------------------
@@ -123,6 +127,17 @@ training_args = RewardConfig(
     hub_model_id                = f"RLHF-And-Friends/{PROJECT_NAME}-{EXP_NAME}",
 )
 
+# Optimizer config
+# =================================================================================================
+
+# optimizer_config = OptimizerConfig(
+#     optimizer_type = AdamW,
+#     layer_lr={
+#         "score": 3e-6,
+#         "lora": 3e-6,
+#     },
+#     scheduler = CosineAnnealingLR,
+# )
 
 ###################################################################################################
 # TOKENIZER & MODELS
@@ -131,9 +146,10 @@ training_args = RewardConfig(
 # Tokenizer
 # =================================================================================================
 
-tokenizer = PreTrainedTokenizerFast.from_pretrained(
+tokenizer = AutoTokenizer.from_pretrained(
     model_config.model_name_or_path,
     pad_token = "<|pad|>",
+    add_eos_token = True, # To add EOS token during tokenization
 )
 
 # Model
@@ -150,7 +166,7 @@ torch_dtype = getattr(torch, model_config.torch_dtype)
 
 # Create model
 # -------------------------------------------------------------------------------------------------
-model = LlamaForSequenceClassification.from_pretrained(
+model = AutoModelForSequenceClassification.from_pretrained(
     model_config.model_name_or_path,
     num_labels = 1,
     quantization_config = quantization_config,
@@ -189,25 +205,50 @@ eval_dataset = dataset[DATASET_VAL_SPLIT].select(range(EVAL_SIZE))
 # Apply chat tamplate
 # =================================================================================================
 
+# train_dataset = train_dataset.map(
+#     apply_chat_template,
+#     fn_kwargs={
+#         "tokenizer": tokenizer,
+#         "columns_to_apply_to": ["chosen", "rejected"],
+#         "dataset_format": DatasetFormat.CONVERSATIONAL,
+#         "add_generation_prompt": False,
+#     },
+#     batched = True
+# )
+# eval_dataset = eval_dataset.map(
+#     apply_chat_template,
+#     fn_kwargs={
+#         "tokenizer": tokenizer,
+#         "columns_to_apply_to": ["chosen", "rejected"],
+#         "dataset_format": DatasetFormat.CONVERSATIONAL,
+#         "add_generation_prompt": False,
+#     },
+#     batched = True
+# )
+
+# Cat prompt and completions
+# =================================================================================================
+
 train_dataset = train_dataset.map(
-    apply_chat_template,
+    cat_columns_contents,
     fn_kwargs={
-        "tokenizer": tokenizer,
-        "columns_to_apply_to": ["chosen", "rejected"],
-        "dataset_format": DatasetFormat.CONVERSATIONAL,
-        "add_generation_prompt": False,
+        "lhs_column_names": ["prompt", "prompt"],
+        "rhs_column_names": ["chosen", "rejected"],
+        "cat_column_names": ["chosen", "rejected"],
     },
-    batched = True
+    desc = "Train dataset concatenation",
+    load_from_cache_file=False,
 )
+
 eval_dataset = eval_dataset.map(
-    apply_chat_template,
+    cat_columns_contents,
     fn_kwargs={
-        "tokenizer": tokenizer,
-        "columns_to_apply_to": ["chosen", "rejected"],
-        "dataset_format": DatasetFormat.CONVERSATIONAL,
-        "add_generation_prompt": False,
+        "lhs_column_names": ["prompt", "prompt"],
+        "rhs_column_names": ["chosen", "rejected"],
+        "cat_column_names": ["chosen", "rejected"],
     },
-    batched = True
+    desc = "Eval dataset concatenation",
+    load_from_cache_file=False,
 )
 
 # Tokenize
@@ -220,8 +261,11 @@ train_dataset = train_dataset.map(
         "columns_to_apply_to": ["chosen", "rejected"],
         "columns_for_ids": ["input_ids_chosen", "input_ids_rejected"],
         "columns_for_attn": ["attention_mask_chosen", "attention_mask_rejected"],
+        "add_special_tokens": True,
     },
-    batched = True
+    desc="Train dataset tokenization",
+    batched = True,
+    load_from_cache_file=False,
 )
 eval_dataset = eval_dataset.map(
     tokenize,
@@ -230,8 +274,11 @@ eval_dataset = eval_dataset.map(
         "columns_to_apply_to": ["chosen", "rejected"],
         "columns_for_ids": ["input_ids_chosen", "input_ids_rejected"],
         "columns_for_attn": ["attention_mask_chosen", "attention_mask_rejected"],
+        "add_special_tokens": True,
     },
-    batched = True
+    desc="Eval dataset tokenization",
+    batched = True,
+    load_from_cache_file=False,
 )
 
 # Filter datasets by length (keep only examples which are no longer then
@@ -268,7 +315,11 @@ def main() -> None:
     )
     trainer.train()
 
-    model.resize_token_embeddings(len(tokenizer) - 1)
+    # Delete PAD token from the model's vocabulary
+    trainer.model.resize_token_embeddings(len(tokenizer) - 1)
+    # Merge LoRA adapters into the model
+    trainer.model = trainer.model.merge_and_unload()
+    # Push model to hub
     trainer.push_to_hub(dataset_name=DATASET_PATH)
 
 
