@@ -1,30 +1,22 @@
 import os
 
 import torch
-from torch.optim import AdamW
-from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from datasets import load_dataset
 
 from transformers import (
-    AutoModelForSequenceClassification, AutoTokenizer
+    AutoModelForCausalLM, AutoTokenizer
 )
 
 from peft import get_peft_model, TaskType, prepare_model_for_kbit_training
 
 from trl import (
     ModelConfig,
-    RewardConfig,
-    RewardTrainer,
+    SFTConfig,
+    SFTTrainer,
     get_peft_config,
     get_quantization_config,
-)
-
-from fed_ppo.utils import (
-    tokenize,
-    cat_columns_contents,
-    custom_optimizer,
-    OptimizerConfig,
+    DataCollatorForCompletionOnlyLM
 )
 
 ###################################################################################################
@@ -38,14 +30,14 @@ MODEL_NAME = MODEL_PATH.split('/')[1]
 
 # Dataset path
 # =================================================================================================
-DATASET_PATH        = "trl-lib/tldr-preference"
+DATASET_PATH        = "trl-lib/tldr"
 DATASET_TRAIN_SPLIT = "train"
 DATASET_VAL_SPLIT   = "validation"
 DATASET_NAME        = DATASET_PATH.split('/')[1]
 
 # Project name
 # =================================================================================================
-PROJECT_NAME = "RM-TLDR"
+PROJECT_NAME = "SFT-TLDR"
 EXP_NAME = f"{MODEL_NAME}"
 
 # WandB
@@ -58,9 +50,7 @@ os.environ["WANDB_ENTITY"]  = "RADFAN"
 # CONFIGS
 ###################################################################################################
 
-# Datasets will be filtered according to max length
-TOK_LIM     = 1024
-TRAIN_SIZE  = 92858
+TRAIN_SIZE  = 116722
 EVAL_SIZE   = 2000
 
 # Model config
@@ -72,13 +62,12 @@ model_config = ModelConfig(
     # LoRA
     # ---------------------------------------------------------------------------------------------
     use_peft             = True,
-    lora_task_type       = TaskType.SEQ_CLS,
+    lora_task_type       = TaskType.CAUSAL_LM,
     use_rslora           = False,
     lora_r               = 16,
     lora_alpha           = 32,
     lora_dropout         = 0.0,
     lora_target_modules  = ["q_proj", "k_proj", "v_proj", "o_proj"],
-    # Head will require grad automatically
     lora_modules_to_save = None,
 
     # Quantization
@@ -93,11 +82,13 @@ model_config = ModelConfig(
 # Reward trainer config
 # =================================================================================================
 
-training_args = RewardConfig(
-    # Reward trainer params
+training_args = SFTConfig(
+    # SFT trainer params
     # ---------------------------------------------------------------------------------------------
+
     dataset_num_proc            = 16,
-    center_rewards_coefficient  = None,
+    max_seq_length              = 1024,
+    dataset_text_field          = None,
 
     # Common
     # ---------------------------------------------------------------------------------------------
@@ -109,7 +100,7 @@ training_args = RewardConfig(
     gradient_accumulation_steps = 4,
     gradient_checkpointing      = False,
     bf16                        = True,
-    
+
     # Optimizer
     # ---------------------------------------------------------------------------------------------
     learning_rate = 3e-6,
@@ -127,18 +118,6 @@ training_args = RewardConfig(
     hub_model_id                = f"RLHF-And-Friends/{PROJECT_NAME}-{EXP_NAME}",
 )
 
-# Optimizer config
-# =================================================================================================
-
-# optimizer_config = OptimizerConfig(
-#     optimizer_type = AdamW,
-#     layer_lr={
-#         "score": 3e-6,
-#         "lora": 3e-6,
-#     },
-#     scheduler = CosineAnnealingLR,
-# )
-
 ###################################################################################################
 # TOKENIZER & MODELS
 ###################################################################################################
@@ -148,8 +127,9 @@ training_args = RewardConfig(
 
 tokenizer = AutoTokenizer.from_pretrained(
     model_config.model_name_or_path,
-    pad_token = "<|pad|>",
-    add_eos_token = True, # To add EOS token during tokenization
+    pad_token = "<pad>",
+    add_eos_token = True, # To add EOS token during tokenization with `add_sepcial_tokens = True``
+    padding_side = "right",
 )
 
 # Model
@@ -166,7 +146,7 @@ torch_dtype = getattr(torch, model_config.torch_dtype)
 
 # Create model
 # -------------------------------------------------------------------------------------------------
-model = AutoModelForSequenceClassification.from_pretrained(
+model = AutoModelForCausalLM.from_pretrained(
     model_config.model_name_or_path,
     num_labels = 1,
     quantization_config = quantization_config,
@@ -202,102 +182,26 @@ dataset = load_dataset(DATASET_PATH)
 train_dataset = dataset[DATASET_TRAIN_SPLIT].select(range(TRAIN_SIZE))
 eval_dataset = dataset[DATASET_VAL_SPLIT].select(range(EVAL_SIZE))
 
-# Apply chat tamplate
+# Formatting function to cat prompt and completion
 # =================================================================================================
 
-# train_dataset = train_dataset.map(
-#     apply_chat_template,
-#     fn_kwargs={
-#         "tokenizer": tokenizer,
-#         "columns_to_apply_to": ["chosen", "rejected"],
-#         "dataset_format": DatasetFormat.CONVERSATIONAL,
-#         "add_generation_prompt": False,
-#     },
-#     batched = True
-# )
-# eval_dataset = eval_dataset.map(
-#     apply_chat_template,
-#     fn_kwargs={
-#         "tokenizer": tokenizer,
-#         "columns_to_apply_to": ["chosen", "rejected"],
-#         "dataset_format": DatasetFormat.CONVERSATIONAL,
-#         "add_generation_prompt": False,
-#     },
-#     batched = True
-# )
+def cat_prompt_completion(examples):
+    if isinstance(examples["prompt"], list):
+        output_texts = []
+        for i in range(len(examples["prompt"])):
+            cat_sample = examples["prompt"][i] + examples["completion"][i]
+            output_texts.append(cat_sample)
 
-# Cat prompt and completions
+        return output_texts
+
+    return examples["prompt"][i] + examples["completion"][i]
+
+# Data collator to mask prompt labels
 # =================================================================================================
 
-train_dataset = train_dataset.map(
-    cat_columns_contents,
-    fn_kwargs={
-        "lhs_column_names": ["prompt", "prompt"],
-        "rhs_column_names": ["chosen", "rejected"],
-        "cat_column_names": ["chosen", "rejected"],
-    },
-    desc = "Train dataset concatenation",
-    load_from_cache_file=False,
+masking_collator = DataCollatorForCompletionOnlyLM(
+    response_template="TL;DR:", tokenizer = tokenizer
 )
-
-eval_dataset = eval_dataset.map(
-    cat_columns_contents,
-    fn_kwargs={
-        "lhs_column_names": ["prompt", "prompt"],
-        "rhs_column_names": ["chosen", "rejected"],
-        "cat_column_names": ["chosen", "rejected"],
-    },
-    desc = "Eval dataset concatenation",
-    load_from_cache_file=False,
-)
-
-# Tokenize
-# =================================================================================================
-
-train_dataset = train_dataset.map(
-    tokenize,
-    fn_kwargs={
-        "tokenizer": tokenizer,
-        "columns_to_apply_to": ["chosen", "rejected"],
-        "columns_for_ids": ["input_ids_chosen", "input_ids_rejected"],
-        "columns_for_attn": ["attention_mask_chosen", "attention_mask_rejected"],
-        "add_special_tokens": True,
-    },
-    desc="Train dataset tokenization",
-    batched = True,
-    load_from_cache_file=False,
-)
-eval_dataset = eval_dataset.map(
-    tokenize,
-    fn_kwargs={
-        "tokenizer": tokenizer,
-        "columns_to_apply_to": ["chosen", "rejected"],
-        "columns_for_ids": ["input_ids_chosen", "input_ids_rejected"],
-        "columns_for_attn": ["attention_mask_chosen", "attention_mask_rejected"],
-        "add_special_tokens": True,
-    },
-    desc="Eval dataset tokenization",
-    batched = True,
-    load_from_cache_file=False,
-)
-
-# Filter datasets by length (keep only examples which are no longer then
-# `max_length` tokens)
-# =================================================================================================
-
-def len_filter(x) -> bool:
-    return len(x["input_ids_chosen"]) <= TOK_LIM and len(x["input_ids_rejected"]) <= TOK_LIM
-
-train_dataset = train_dataset.filter(
-    len_filter,
-    num_proc=training_args.dataset_num_proc,
-)
-
-eval_dataset = eval_dataset.filter(
-    len_filter,
-    num_proc=training_args.dataset_num_proc,
-)
-
 
 ###################################################################################################
 # TRAINING
@@ -306,12 +210,14 @@ eval_dataset = eval_dataset.filter(
 # Train
 # =================================================================================================
 def main() -> None:
-    trainer = RewardTrainer(
+    trainer = SFTTrainer(
         model            = model,
         processing_class = tokenizer,
         args             = training_args,
         train_dataset    = train_dataset,
         eval_dataset     = eval_dataset,
+        formatting_func  = cat_prompt_completion,
+        data_collator    = masking_collator,
     )
     trainer.train()
 
