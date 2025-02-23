@@ -19,6 +19,8 @@ from trl import (
     DataCollatorForCompletionOnlyLM
 )
 
+from fed_ppo.utils import push_to_hub_with_retries
+
 ###################################################################################################
 # NAMES & PATHS
 ###################################################################################################
@@ -238,9 +240,9 @@ def main() -> None:
     # ---------------------------------------------------------------------------------------------
     trainer.model = trainer.model.merge_and_unload()
 
-    # Push model to hub
+    # Push model to hub with retries
     # ---------------------------------------------------------------------------------------------
-    trainer.push_to_hub(dataset_name=DATASET_PATH)
+    push_to_hub_with_retries(trainer, DATASET_NAME)
 
 
 # Accelerate entry-point

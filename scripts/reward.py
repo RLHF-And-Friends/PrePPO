@@ -25,6 +25,7 @@ from fed_ppo.utils import (
     cat_columns_contents,
     custom_optimizer,
     OptimizerConfig,
+    push_to_hub_with_retries
 )
 
 ###################################################################################################
@@ -333,7 +334,7 @@ def main() -> None:
 
     # Push model to hub
     # ---------------------------------------------------------------------------------------------
-    trainer.push_to_hub(dataset_name=DATASET_PATH)
+    push_to_hub_with_retries(trainer, DATASET_NAME)
 
 
 # Accelerate entry-point

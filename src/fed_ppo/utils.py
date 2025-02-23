@@ -4,6 +4,7 @@ import typing as tp
 from enum import Enum
 
 import copy
+import time
 
 import wandb
 
@@ -12,7 +13,7 @@ from dataclasses import dataclass
 import torch
 from torch import nn
 
-from transformers import PreTrainedTokenizer
+from transformers import PreTrainedTokenizer, Trainer
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
 from trl.data_utils import is_conversational
@@ -173,6 +174,30 @@ def set_bias(
             new_layer.weight.data = layer.weight.data.clone()
             new_layer.bias.data.fill_(bias)
             setattr(parent, layer_name, new_layer)
+
+
+# Push to hub with retries
+# =================================================================================================
+
+def push_to_hub_with_retries(
+    trainer: Trainer,
+    dataset_name: str,
+    max_retries: int = 10,
+    delay: int = 5
+):
+    for attempt in range(max_retries):
+        try:
+            print(f"Attempt {attempt + 1} to push...")
+            trainer.push_to_hub(dataset_name=dataset_name)
+            print("✅ Push successful!")
+            return
+        except Exception as e:
+            print(f"❌ Push failed: {e}")
+            if attempt < max_retries - 1:
+                print(f"Retrying in {delay} seconds...")
+                time.sleep(delay)  # Wait before retrying
+            else:
+                print("❌ Maximum retries reached. Push failed.")
 
 
 # =================================================================================================
