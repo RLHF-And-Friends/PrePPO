@@ -125,6 +125,10 @@ training_args = SFTConfig(
 # Tokenizer
 # =================================================================================================
 
+initial_tokenizer = AutoTokenizer.from_pretrained(
+    model_config.model_name_or_path
+)
+
 tokenizer = AutoTokenizer.from_pretrained(
     model_config.model_name_or_path,
     pad_token = "<pad>",
@@ -200,7 +204,8 @@ def cat_prompt_completion(examples):
 # =================================================================================================
 
 masking_collator = DataCollatorForCompletionOnlyLM(
-    response_template="TL;DR:", tokenizer = tokenizer
+    response_template=[11521, 28745, 4232, 28747],
+    tokenizer = tokenizer
 )
 
 ###################################################################################################
@@ -222,10 +227,19 @@ def main() -> None:
     trainer.train()
 
     # Delete PAD token from the model's vocabulary
-    # trainer.model.resize_token_embeddings(len(tokenizer) - 1)
+    # ---------------------------------------------------------------------------------------------
+    trainer.model.resize_token_embeddings(len(tokenizer) - 1)
+
+    # Revert tokenizer to the initial state
+    # ---------------------------------------------------------------------------------------------
+    trainer.tokenizer = initial_tokenizer
+
     # Merge LoRA adapters into the model
+    # ---------------------------------------------------------------------------------------------
     trainer.model = trainer.model.merge_and_unload()
+
     # Push model to hub
+    # ---------------------------------------------------------------------------------------------
     trainer.push_to_hub(dataset_name=DATASET_PATH)
 
 

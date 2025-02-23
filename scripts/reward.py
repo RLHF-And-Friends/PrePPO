@@ -146,9 +146,13 @@ training_args = RewardConfig(
 # Tokenizer
 # =================================================================================================
 
+initial_tokenizer = AutoTokenizer.from_pretrained(
+    model_config.model_name_or_path
+)
+
 tokenizer = AutoTokenizer.from_pretrained(
     model_config.model_name_or_path,
-    pad_token = "<|pad|>",
+    pad_token = "<pad>",
     add_eos_token = True, # To add EOS token during tokenization
 )
 
@@ -316,10 +320,19 @@ def main() -> None:
     trainer.train()
 
     # Delete PAD token from the model's vocabulary
-    # trainer.model.resize_token_embeddings(len(tokenizer) - 1)
+    # ---------------------------------------------------------------------------------------------
+    trainer.model.resize_token_embeddings(len(tokenizer) - 1)
+
+    # Revert tokenizer to the initial state
+    # ---------------------------------------------------------------------------------------------
+    trainer.tokenizer = initial_tokenizer
+
     # Merge LoRA adapters into the model
+    # ---------------------------------------------------------------------------------------------
     trainer.model = trainer.model.merge_and_unload()
+
     # Push model to hub
+    # ---------------------------------------------------------------------------------------------
     trainer.push_to_hub(dataset_name=DATASET_PATH)
 
 
