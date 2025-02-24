@@ -2,7 +2,6 @@ from datasets import load_dataset
 
 from trl import OpenAIPairwiseJudge
 
-from hf_ppo.scripts.datasets.data_utils import push_to_hub_with_retries
 from huggingface_hub import HfApi
 
 

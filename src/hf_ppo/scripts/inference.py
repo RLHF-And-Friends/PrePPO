@@ -1,7 +1,6 @@
 from datasets import load_dataset, Dataset
 
-from hf_ppo.utils import get_responses
-from hf_ppo.scripts.datasets.data_utils import push_to_hub_with_retries
+from hf_ppo.utils import get_responses, push_dataset_to_hub_with_retries
 
 
 # #################################################################################################
@@ -60,7 +59,7 @@ responses_dataset = Dataset.from_dict(
     }
 )
 
-push_to_hub_with_retries(
+push_dataset_to_hub_with_retries(
     responses_dataset,
     repo_id=f"RLHF-And-Friends/{DATASET_NAME}-{FT_MODEL_NAME}-completions",
     split = "test"
