@@ -1,8 +1,6 @@
 import os
 
 import torch
-from torch.optim import AdamW
-from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from datasets import load_dataset
 
@@ -21,25 +19,21 @@ from trl import (
 )
 
 from fed_ppo.utils import (
-    tokenize,
-    cat_columns_contents,
-    custom_optimizer,
-    OptimizerConfig,
     push_to_hub_with_retries
 )
 
-###################################################################################################
+# #################################################################################################
 # NAMES & PATHS
-###################################################################################################
+# #################################################################################################
 
 # Model path
 # =================================================================================================
-MODEL_PATH = "mistral-community/Mistral-7B-v0.2"
+MODEL_PATH = "RLHF-And-Friends/SFT-TLDR-Mistral-7B-v0.2"
 MODEL_NAME = MODEL_PATH.split('/')[1]
 
 # Dataset path
 # =================================================================================================
-DATASET_PATH        = "trl-lib/tldr-preference"
+DATASET_PATH        = "RLHF-And-Friends/tldr-preference"
 DATASET_TRAIN_SPLIT = "train"
 DATASET_VAL_SPLIT   = "validation"
 DATASET_NAME        = DATASET_PATH.split('/')[1]
@@ -55,12 +49,10 @@ os.environ["WANDB_PROJECT"] = PROJECT_NAME
 os.environ["WANDB_ENTITY"]  = "RADFAN"
 
 
-###################################################################################################
+# #################################################################################################
 # CONFIGS
-###################################################################################################
+# #################################################################################################
 
-# Datasets will be filtered according to max length
-TOK_LIM     = 1024
 TRAIN_SIZE  = 92858
 EVAL_SIZE   = 2000
 
@@ -99,6 +91,7 @@ training_args = RewardConfig(
     # ---------------------------------------------------------------------------------------------
     dataset_num_proc            = 16,
     center_rewards_coefficient  = None,
+    max_length                  = 1024,
 
     # Common
     # ---------------------------------------------------------------------------------------------
@@ -114,7 +107,6 @@ training_args = RewardConfig(
     # Optimizer
     # ---------------------------------------------------------------------------------------------
     learning_rate = 3e-6,
-    adam_epsilon  = 1e-5,
 
     # Logs
     # ---------------------------------------------------------------------------------------------
@@ -124,25 +116,13 @@ training_args = RewardConfig(
 
     # Push to hub after training
     # ---------------------------------------------------------------------------------------------
-    push_to_hub                 = False, # would push manually with pad embedding removed
+    push_to_hub                 = False, # push manually with pad embedding removed
     hub_model_id                = f"RLHF-And-Friends/{PROJECT_NAME}-{EXP_NAME}",
 )
 
-# Optimizer config
-# =================================================================================================
-
-# optimizer_config = OptimizerConfig(
-#     optimizer_type = AdamW,
-#     layer_lr={
-#         "score": 3e-6,
-#         "lora": 3e-6,
-#     },
-#     scheduler = CosineAnnealingLR,
-# )
-
-###################################################################################################
+# #################################################################################################
 # TOKENIZER & MODELS
-###################################################################################################
+# #################################################################################################
 
 # Tokenizer
 # =================================================================================================
@@ -166,7 +146,6 @@ quantization_config = get_quantization_config(model_config)
 
 # Set model type
 # -------------------------------------------------------------------------------------------------
-
 torch_dtype = getattr(torch, model_config.torch_dtype)
 
 # Create model
@@ -186,7 +165,6 @@ if model_config.load_in_4bit or model_config.load_in_8bit:
 
 # Add padding token
 # -------------------------------------------------------------------------------------------------
-
 model.resize_token_embeddings(len(tokenizer), mean_resizing=False)
 model.config.pad_token_id = tokenizer.pad_token_id
 
@@ -196,117 +174,19 @@ lora_config = get_peft_config(model_config)
 model = get_peft_model(model, lora_config)
 
 
-###################################################################################################
-# DATASET
-###################################################################################################
+# #################################################################################################
+# LOAD DATASET
+# #################################################################################################
 
-# Load dataset
-# =================================================================================================
 dataset = load_dataset(DATASET_PATH)
 
-train_dataset = dataset[DATASET_TRAIN_SPLIT].select(range(TRAIN_SIZE))
-eval_dataset = dataset[DATASET_VAL_SPLIT].select(range(EVAL_SIZE))
-
-# Apply chat tamplate
-# =================================================================================================
-
-# train_dataset = train_dataset.map(
-#     apply_chat_template,
-#     fn_kwargs={
-#         "tokenizer": tokenizer,
-#         "columns_to_apply_to": ["chosen", "rejected"],
-#         "dataset_format": DatasetFormat.CONVERSATIONAL,
-#         "add_generation_prompt": False,
-#     },
-#     batched = True
-# )
-# eval_dataset = eval_dataset.map(
-#     apply_chat_template,
-#     fn_kwargs={
-#         "tokenizer": tokenizer,
-#         "columns_to_apply_to": ["chosen", "rejected"],
-#         "dataset_format": DatasetFormat.CONVERSATIONAL,
-#         "add_generation_prompt": False,
-#     },
-#     batched = True
-# )
-
-# Cat prompt and completions
-# =================================================================================================
-
-train_dataset = train_dataset.map(
-    cat_columns_contents,
-    fn_kwargs={
-        "lhs_column_names": ["prompt", "prompt"],
-        "rhs_column_names": ["chosen", "rejected"],
-        "cat_column_names": ["chosen", "rejected"],
-    },
-    desc = "Train dataset concatenation",
-    load_from_cache_file=False,
-)
-
-eval_dataset = eval_dataset.map(
-    cat_columns_contents,
-    fn_kwargs={
-        "lhs_column_names": ["prompt", "prompt"],
-        "rhs_column_names": ["chosen", "rejected"],
-        "cat_column_names": ["chosen", "rejected"],
-    },
-    desc = "Eval dataset concatenation",
-    load_from_cache_file=False,
-)
-
-# Tokenize
-# =================================================================================================
-
-train_dataset = train_dataset.map(
-    tokenize,
-    fn_kwargs={
-        "tokenizer": tokenizer,
-        "columns_to_apply_to": ["chosen", "rejected"],
-        "columns_for_ids": ["input_ids_chosen", "input_ids_rejected"],
-        "columns_for_attn": ["attention_mask_chosen", "attention_mask_rejected"],
-        "add_special_tokens": True,
-    },
-    desc="Train dataset tokenization",
-    batched = True,
-    load_from_cache_file=False,
-)
-eval_dataset = eval_dataset.map(
-    tokenize,
-    fn_kwargs={
-        "tokenizer": tokenizer,
-        "columns_to_apply_to": ["chosen", "rejected"],
-        "columns_for_ids": ["input_ids_chosen", "input_ids_rejected"],
-        "columns_for_attn": ["attention_mask_chosen", "attention_mask_rejected"],
-        "add_special_tokens": True,
-    },
-    desc="Eval dataset tokenization",
-    batched = True,
-    load_from_cache_file=False,
-)
-
-# Filter datasets by length (keep only examples which are no longer then
-# `max_length` tokens)
-# =================================================================================================
-
-def len_filter(x) -> bool:
-    return len(x["input_ids_chosen"]) <= TOK_LIM and len(x["input_ids_rejected"]) <= TOK_LIM
-
-train_dataset = train_dataset.filter(
-    len_filter,
-    num_proc=training_args.dataset_num_proc,
-)
-
-eval_dataset = eval_dataset.filter(
-    len_filter,
-    num_proc=training_args.dataset_num_proc,
-)
+train_dataset = dataset["train"].select(range(TRAIN_SIZE))
+eval_dataset = dataset["validation"].select(range(EVAL_SIZE))
 
 
-###################################################################################################
+# #################################################################################################
 # TRAINING
-###################################################################################################
+# #################################################################################################
 
 # Train
 # =================================================================================================
