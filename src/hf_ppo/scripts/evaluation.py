@@ -4,12 +4,17 @@ from trl import OpenAIPairwiseJudge
 
 from huggingface_hub import HfApi
 
+'''
+set API key in advance:
+
+export OPENAI_API_KEY=<API key here>
+'''
 
 # #################################################################################################
 # NAMES & PATHS
 # #################################################################################################
 
-DATASET_PATH = f"RLHF-And-Friends/-completions"
+DATASET_PATH = "RLHF-And-Friends/tldr-SFT-TLDR-Mistral-7B-v0.2-completions"
 NUM_SAMPLES = 100
 
 
@@ -81,7 +86,14 @@ print(f"GPT-judged winrate: {gpt_winrate}")
 # Add winrate metric to README.md
 # =================================================================================================
 
-readme_text = f"# ## Winrate based on {MODEL_TO_USE} opinion: {gpt_winrate}."
+readme_text = f"""---
+language: en
+metrics:
+  - GPT-based winrate: {gpt_winrate}
+---
+
+Winrate based on {MODEL_TO_USE} opinion: {gpt_winrate}.
+"""
 
 api = HfApi()
 api.upload_file(
