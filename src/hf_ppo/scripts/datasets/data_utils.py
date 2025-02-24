@@ -98,13 +98,14 @@ def push_to_hub_with_retries(
     dataset: Dataset,
     repo_id: str,
     split: str,
+    dataset_card: str = "",
     max_retries: int = 10,
     delay: int = 5
 ):
     for attempt in range(max_retries):
         try:
             print(f"Attempt {attempt + 1} to push...")
-            dataset.push_to_hub(repo_id=repo_id, split=split)
+            dataset.push_to_hub(repo_id=repo_id, split=split, )
             print("✅ Push successful!")
             return
         except Exception as e:

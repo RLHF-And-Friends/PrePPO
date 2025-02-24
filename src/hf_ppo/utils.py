@@ -2,38 +2,22 @@ from __future__ import annotations
 
 import typing as tp
 
-import copy
 import time
-
-import wandb
+from tqdm import tqdm
 
 from dataclasses import dataclass
 
 import torch
 from torch import nn
 
-from transformers import Trainer
-from transformers.modeling_outputs import CausalLMOutputWithPast
+from transformers import (
+    Trainer, AutoModelForCausalLM, AutoTokenizer, pipeline
+)
 
 
 # =================================================================================================
 # Helper Functions
 # =================================================================================================
-
-# Copy and freeze model
-# =================================================================================================
-
-def frozen_copy(model: nn.Module) -> nn.Module:
-    """
-    Get a frozen copy of a model.
-    """
-    frozen = copy.deepcopy(model)
-
-    for param in frozen.parameters():
-        param.requires_grad = False
-
-    return frozen
-
 
 # Create optimizer with different lerning rates for different parameters (e.g. LoRA and head)
 # =================================================================================================
@@ -113,132 +97,52 @@ def push_to_hub_with_retries(
                 print("❌ Maximum retries reached. Push failed.")
 
 
-# =================================================================================================
-# Policies mixture class
-# =================================================================================================
-
-class PolicyMixture(nn.Module):
-    """
-    Weighted normalized sum of policies. Policies contribute proportionally to
-    coefficients given.
-    """
-
-    def __init__(
-        self,
-        policies: tp.Sequence[nn.Module],
-        coefs: tp.Sequence[float]
-    ) -> None:
-
-        super().__init__()
-
-        self._policies = nn.ModuleList(policies)
-        self._coefs = coefs
-
-    def forward(self, *args, **kwargs):
-        logits = []
-        for policy, coef in zip(self._policies, self._coefs):
-            logits.append(policy(*args, **kwargs).logits * coef)
-        res_logits = sum(logits) / sum(self._coefs)
-
-        return CausalLMOutputWithPast(logits=res_logits)
-
-
-# =================================================================================================
-# Policy Commutator
+# Infer model
 # =================================================================================================
 
-Matrix = tp.Sequence[tp.Sequence[float]]
+def get_responses(
+    prompts: list[str],
+    model_path: str,
+    batch_size: int = 8,
+    max_new_tokens: int = 512,
+    is_chat_model: bool = False,
+) -> list[str]:
 
+    model = AutoModelForCausalLM.from_pretrained(
+        model_path,
+        torch_dtype = torch.bfloat16,
+    )
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    tokenizer.pad_token_id = tokenizer.eos_token_id
 
-class PolicyCommutator:
-    """
-    Policy mixture dispatcher for a set of policies according to commutation
-    matrix.
-    """
+    text_generator = pipeline(
+        task="text-generation",
+        model=model,
+        tokenizer=tokenizer,
+        device_map='auto',
+        batch_size=batch_size,
+        max_new_tokens=max_new_tokens,
+    )
 
-    def __init__(
-        self,
-        policies: tp.Sequence[nn.Module],
-        commutant: Matrix,
-    ) -> None:
+    if is_chat_model:
+        inputs = [[{'role': "user", 'content': prompt}] for prompt in prompts]
+    else:
+        inputs = prompts
 
-        assert len(commutant) == len(policies)
-        # warning: 2nd commutant dimension validity not ensured
+    responses = []
+    for idx in tqdm(
+        range(0, len(inputs), batch_size), desc=f'{model_path} inference'
+    ):
+        batch = inputs[idx:idx+batch_size]
+        responses.extend(text_generator(batch))
 
-        self._policies = policies
-        self._commutant = commutant
+    if is_chat_model:
+        text_responses = [
+            response[0]['generated_text'][-1]['content'] for response in responses
+        ]
+    else:
+        text_responses = [
+            response[0]['generated_text'] for response in responses
+        ]
 
-    def __getitem__(self, idx: int) -> PolicyMixture:
-        return self.get_reference_policy(idx)
-
-    def get_reference_policy(self, idx: int) -> PolicyMixture:
-        return PolicyMixture(self._policies, self._commutant[idx])
-
-
-# =================================================================================================
-# Wandb Session Context Manger
-# =================================================================================================
-
-class WandbSessionManager:
-    def __init__(self, num_sessions: int) -> None:
-        self._run_id_map: list[tp.Optional[int]] = num_sessions * [None]
-
-    def __getitem__(self, idx: int) -> WandbSessionBuilder:
-        return WandbSessionBuilder(
-            manager=self,
-            idx=idx,
-            run_id=self._run_id_map[idx],
-        )
-
-    def __setitem__(self, idx: int, run_id: int) -> None:
-        self._run_id_map[idx] = run_id
-
-
-class WandbSessionBuilder:
-    def __init__(
-        self,
-        manager: WandbSessionManager,
-        idx: int,
-        run_id: tp.Optional[None]
-    ) -> None:
-        self._manager = manager
-        self._idx = idx
-        self._run_id = run_id
-
-    def __call__(self, name: tp.Optional[str] = None) -> WandbSession:
-        return WandbSession(
-            manager=self._manager,
-            idx=self._idx,
-            run_id=self._run_id,
-            name=name
-        )
-
-
-class WandbSession:
-    """
-    Wandb Preemptible Session Context Manager.
-    """
-
-    def __init__(
-        self,
-        manager: WandbSessionManager,
-        idx: int,
-        run_id: tp.Optional[int] = None,
-        name: tp.Optional[str] = None,
-    ) -> None:
-        self._manager = manager
-        self._idx = idx
-        self._run_id = run_id
-        self._name = name
-
-    def __enter__(self) -> tp.Self:
-        run = wandb.init(
-            id=self._run_id,
-            name=self._name,
-            resume="allow"
-        )
-        self._manager[self._idx] = run.id
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback) -> None:
-        wandb.finish()
+    return text_responses
