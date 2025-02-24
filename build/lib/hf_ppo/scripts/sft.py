@@ -5,42 +5,41 @@ import torch
 from datasets import load_dataset
 
 from transformers import (
-    AutoModelForSequenceClassification, AutoTokenizer
+    AutoModelForCausalLM, AutoTokenizer
 )
 
 from peft import get_peft_model, TaskType, prepare_model_for_kbit_training
 
 from trl import (
     ModelConfig,
-    RewardConfig,
-    RewardTrainer,
+    SFTConfig,
+    SFTTrainer,
     get_peft_config,
     get_quantization_config,
+    DataCollatorForCompletionOnlyLM
 )
 
-from hf_ppo.utils import (
-    push_to_hub_with_retries
-)
+from hf_ppo.utils import push_to_hub_with_retries
 
-# #################################################################################################
+###################################################################################################
 # NAMES & PATHS
-# #################################################################################################
+###################################################################################################
 
 # Model path
 # =================================================================================================
-MODEL_PATH = "RLHF-And-Friends/SFT-TLDR-Mistral-7B-v0.2"
+MODEL_PATH = "mistral-community/Mistral-7B-v0.2"
 MODEL_NAME = MODEL_PATH.split('/')[1]
 
 # Dataset path
 # =================================================================================================
-DATASET_PATH        = "RLHF-And-Friends/tldr-preference"
+DATASET_PATH        = "trl-lib/tldr"
 DATASET_TRAIN_SPLIT = "train"
 DATASET_VAL_SPLIT   = "validation"
 DATASET_NAME        = DATASET_PATH.split('/')[1]
 
 # Project name
 # =================================================================================================
-PROJECT_NAME = "RM-TLDR"
+PROJECT_NAME = "SFT-TLDR"
 EXP_NAME = f"{MODEL_NAME}"
 
 # WandB
@@ -49,11 +48,11 @@ os.environ["WANDB_PROJECT"] = PROJECT_NAME
 os.environ["WANDB_ENTITY"]  = "RADFAN"
 
 
-# #################################################################################################
+###################################################################################################
 # CONFIGS
-# #################################################################################################
+###################################################################################################
 
-TRAIN_SIZE  = 92858
+TRAIN_SIZE  = 116722
 EVAL_SIZE   = 2000
 
 # Model config
@@ -65,13 +64,12 @@ model_config = ModelConfig(
     # LoRA
     # ---------------------------------------------------------------------------------------------
     use_peft             = True,
-    lora_task_type       = TaskType.SEQ_CLS,
+    lora_task_type       = TaskType.CAUSAL_LM,
     use_rslora           = False,
     lora_r               = 16,
     lora_alpha           = 32,
     lora_dropout         = 0.0,
     lora_target_modules  = ["q_proj", "k_proj", "v_proj", "o_proj"],
-    # Head will require grad automatically
     lora_modules_to_save = None,
 
     # Quantization
@@ -86,12 +84,13 @@ model_config = ModelConfig(
 # Reward trainer config
 # =================================================================================================
 
-training_args = RewardConfig(
-    # Reward trainer params
+training_args = SFTConfig(
+    # SFT trainer params
     # ---------------------------------------------------------------------------------------------
+
     dataset_num_proc            = 16,
-    center_rewards_coefficient  = None,
-    max_length                  = 1024,
+    max_seq_length              = 1024,
+    dataset_text_field          = None,
 
     # Common
     # ---------------------------------------------------------------------------------------------
@@ -103,10 +102,11 @@ training_args = RewardConfig(
     gradient_accumulation_steps = 4,
     gradient_checkpointing      = False,
     bf16                        = True,
-    
+
     # Optimizer
     # ---------------------------------------------------------------------------------------------
     learning_rate = 3e-6,
+    adam_epsilon  = 1e-5,
 
     # Logs
     # ---------------------------------------------------------------------------------------------
@@ -116,13 +116,13 @@ training_args = RewardConfig(
 
     # Push to hub after training
     # ---------------------------------------------------------------------------------------------
-    push_to_hub                 = False, # push manually with pad embedding removed
+    push_to_hub                 = False, # would push manually with pad embedding removed
     hub_model_id                = f"RLHF-And-Friends/{PROJECT_NAME}-{EXP_NAME}",
 )
 
-# #################################################################################################
+###################################################################################################
 # TOKENIZER & MODELS
-# #################################################################################################
+###################################################################################################
 
 # Tokenizer
 # =================================================================================================
@@ -134,7 +134,8 @@ initial_tokenizer = AutoTokenizer.from_pretrained(
 tokenizer = AutoTokenizer.from_pretrained(
     model_config.model_name_or_path,
     pad_token = "<pad>",
-    add_eos_token = True, # To add EOS token during tokenization
+    add_eos_token = True, # To add EOS token during tokenization with `add_sepcial_tokens = True``
+    padding_side = "right",
 )
 
 # Model
@@ -146,11 +147,12 @@ quantization_config = get_quantization_config(model_config)
 
 # Set model type
 # -------------------------------------------------------------------------------------------------
+
 torch_dtype = getattr(torch, model_config.torch_dtype)
 
 # Create model
 # -------------------------------------------------------------------------------------------------
-model = AutoModelForSequenceClassification.from_pretrained(
+model = AutoModelForCausalLM.from_pretrained(
     model_config.model_name_or_path,
     num_labels = 1,
     quantization_config = quantization_config,
@@ -165,6 +167,7 @@ if model_config.load_in_4bit or model_config.load_in_8bit:
 
 # Add padding token
 # -------------------------------------------------------------------------------------------------
+
 model.resize_token_embeddings(len(tokenizer), mean_resizing=False)
 model.config.pad_token_id = tokenizer.pad_token_id
 
@@ -174,29 +177,54 @@ lora_config = get_peft_config(model_config)
 model = get_peft_model(model, lora_config)
 
 
-# #################################################################################################
-# LOAD DATASET
-# #################################################################################################
+###################################################################################################
+# DATASET
+###################################################################################################
 
+# Load dataset
+# =================================================================================================
 dataset = load_dataset(DATASET_PATH)
 
-train_dataset = dataset["train"].select(range(TRAIN_SIZE))
-eval_dataset = dataset["validation"].select(range(EVAL_SIZE))
+train_dataset = dataset[DATASET_TRAIN_SPLIT].select(range(TRAIN_SIZE))
+eval_dataset = dataset[DATASET_VAL_SPLIT].select(range(EVAL_SIZE))
 
+# Formatting function to cat prompt and completion
+# =================================================================================================
 
-# #################################################################################################
+def cat_prompt_completion(examples):
+    if isinstance(examples["prompt"], list):
+        output_texts = []
+        for i in range(len(examples["prompt"])):
+            cat_sample = examples["prompt"][i] + examples["completion"][i]
+            output_texts.append(cat_sample)
+
+        return output_texts
+
+    return examples["prompt"][i] + examples["completion"][i]
+
+# Data collator to mask prompt labels
+# =================================================================================================
+
+masking_collator = DataCollatorForCompletionOnlyLM(
+    response_template=[11521, 28745, 4232, 28747],
+    tokenizer = tokenizer
+)
+
+###################################################################################################
 # TRAINING
-# #################################################################################################
+###################################################################################################
 
 # Train
 # =================================================================================================
 def main() -> None:
-    trainer = RewardTrainer(
+    trainer = SFTTrainer(
         model            = model,
         processing_class = tokenizer,
         args             = training_args,
         train_dataset    = train_dataset,
         eval_dataset     = eval_dataset,
+        formatting_func  = cat_prompt_completion,
+        data_collator    = masking_collator,
     )
     trainer.train()
 
@@ -212,7 +240,7 @@ def main() -> None:
     # ---------------------------------------------------------------------------------------------
     trainer.model = trainer.model.merge_and_unload()
 
-    # Push model to hub
+    # Push model to hub with retries
     # ---------------------------------------------------------------------------------------------
     push_to_hub_with_retries(trainer, DATASET_NAME)
 

@@ -23,6 +23,7 @@ dependencies = [
 	"trl",
 	# ipython dependencies
 	"ipywidgets",
+	"sentencepiece",
 	# logging
 	"wandb",
 	# evaluation judge
