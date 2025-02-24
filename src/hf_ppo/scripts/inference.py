@@ -14,7 +14,7 @@ BASE_MODEL_PATH = "mistral-community/Mistral-7B-v0.2"
 
 # Fine-tuned model
 # -------------------------------------------------------------------------------------------------
-FT_MODEL_PATH = "RLHF-And-Friends/TLDR-Mistral-7B-SFT-PPO"
+FT_MODEL_PATH = "RLHF-And-Friends/SFT-TLDR-Mistral-7B-v0.2"
 # -------------------------------------------------------------------------------------------------
 FT_MODEL_NAME = FT_MODEL_PATH.split('/')[1]
 
