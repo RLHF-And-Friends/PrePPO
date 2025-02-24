@@ -1,5 +1,5 @@
 # venv
-.fed-ppo-venv
+.hf-ppo-venv
 .venv
 .env
 activate
