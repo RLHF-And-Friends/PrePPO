@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hf-ppo"
+name = "hf_ppo"
 version = "0.0.1"
 authors = [
     {name = "Arkadiy Vladimirov", email = "ark.vladimirov@outlook.com"},
