@@ -14,7 +14,7 @@ export OPENAI_API_KEY=<API key here>
 # NAMES & PATHS
 # #################################################################################################
 
-DATASET_PATH = "RLHF-And-Friends/tldr-SFT-TLDR-Mistral-7B-v0.2-completions"
+DATASET_PATH = "RLHF-And-Friends/tldr-TLDR-Mistral-7B-SFT-PPO-completions"
 NUM_SAMPLES = 100
 
 
