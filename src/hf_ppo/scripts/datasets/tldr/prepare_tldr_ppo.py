@@ -14,12 +14,14 @@ dataset = load_dataset("trl-lib/tldr")
 
 train_dataset = dataset["train"].select(range(TRAIN_START, TRAIN_STOP))
 eval_dataset = dataset["validation"]
+test_dataset = dataset["test"]
 
 # Drop 'completion' column from dataset
 # =================================================================================================
 
 train_dataset = train_dataset.remove_columns("completion")
 eval_dataset = eval_dataset.remove_columns("completion")
+test_dataset = test_dataset.remove_columns("completion")
 
 # Push dataset to hub
 # =================================================================================================
@@ -36,4 +38,10 @@ push_dataset_to_hub_with_retries(
     eval_dataset,
     repo_id=f"RLHF-And-Friends/{NEW_DATASET_NAME}",
     split="validation"
+)
+
+push_dataset_to_hub_with_retries(
+    test_dataset,
+    repo_id=f"RLHF-And-Friends/{NEW_DATASET_NAME}",
+    split="test"
 )

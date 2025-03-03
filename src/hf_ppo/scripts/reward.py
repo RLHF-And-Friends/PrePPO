@@ -28,7 +28,7 @@ from hf_ppo.utils import (
 
 # Model path
 # =================================================================================================
-MODEL_PATH = "RLHF-And-Friends/SFT-TLDR-Mistral-7B-v0.2"
+MODEL_PATH = "RLHF-And-Friends/TLDR-Mistral-7B-SmallSFT"
 MODEL_NAME = MODEL_PATH.split('/')[1]
 
 # Dataset path
@@ -98,9 +98,9 @@ training_args = RewardConfig(
     run_name                    = EXP_NAME,
     output_dir                  = f"~/hf/models/{PROJECT_NAME}/{EXP_NAME}",
     num_train_epochs            = 1,
-    per_device_train_batch_size = 4,
-    per_device_eval_batch_size  = 4,
-    gradient_accumulation_steps = 4,
+    per_device_train_batch_size = 2,
+    per_device_eval_batch_size  = 2,
+    gradient_accumulation_steps = 8,
     gradient_checkpointing      = False,
     bf16                        = True,
     

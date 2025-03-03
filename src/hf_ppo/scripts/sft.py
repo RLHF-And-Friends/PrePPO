@@ -32,7 +32,7 @@ MODEL_NAME = MODEL_PATH.split('/')[1]
 
 # Dataset path
 # =================================================================================================
-DATASET_PATH        = "trl-lib/tldr"
+DATASET_PATH        = "RLHF-And-Friends/tldr-sft"
 DATASET_TRAIN_SPLIT = "train"
 DATASET_VAL_SPLIT   = "validation"
 DATASET_NAME        = DATASET_PATH.split('/')[1]
@@ -40,7 +40,7 @@ DATASET_NAME        = DATASET_PATH.split('/')[1]
 # Project name
 # =================================================================================================
 PROJECT_NAME = "SFT-TLDR"
-EXP_NAME = f"{MODEL_NAME}"
+EXP_NAME = f"{MODEL_NAME}-SMALL"
 
 # WandB
 # =================================================================================================
@@ -52,7 +52,7 @@ os.environ["WANDB_ENTITY"]  = "RADFAN"
 # CONFIGS
 ###################################################################################################
 
-TRAIN_SIZE  = 116722
+TRAIN_SIZE  = 20000
 EVAL_SIZE   = 2000
 
 # Model config
@@ -90,13 +90,12 @@ training_args = SFTConfig(
 
     dataset_num_proc            = 16,
     max_seq_length              = 1024,
-    dataset_text_field          = None,
 
     # Common
     # ---------------------------------------------------------------------------------------------
     run_name                    = EXP_NAME,
     output_dir                  = f"~/hf/models/{PROJECT_NAME}/{EXP_NAME}",
-    num_train_epochs            = 1,
+    num_train_epochs            = 2,
     per_device_train_batch_size = 4,
     per_device_eval_batch_size  = 4,
     gradient_accumulation_steps = 4,
@@ -188,19 +187,6 @@ dataset = load_dataset(DATASET_PATH)
 train_dataset = dataset[DATASET_TRAIN_SPLIT].select(range(TRAIN_SIZE))
 eval_dataset = dataset[DATASET_VAL_SPLIT].select(range(EVAL_SIZE))
 
-# Formatting function to cat prompt and completion
-# =================================================================================================
-
-def cat_prompt_completion(examples):
-    if isinstance(examples["prompt"], list):
-        output_texts = []
-        for i in range(len(examples["prompt"])):
-            cat_sample = examples["prompt"][i] + examples["completion"][i]
-            output_texts.append(cat_sample)
-
-        return output_texts
-
-    return examples["prompt"][i] + examples["completion"][i]
 
 # Data collator to mask prompt labels
 # =================================================================================================
@@ -223,7 +209,6 @@ def main() -> None:
         args             = training_args,
         train_dataset    = train_dataset,
         eval_dataset     = eval_dataset,
-        formatting_func  = cat_prompt_completion,
         data_collator    = masking_collator,
     )
     trainer.train()

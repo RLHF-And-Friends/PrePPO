@@ -9,19 +9,19 @@ from hf_ppo.utils import get_responses, push_dataset_to_hub_with_retries
 
 # Base model
 # -------------------------------------------------------------------------------------------------
-BASE_MODEL_PATH = "RLHF-And-Friends/TLDR-Mistral-7B-SFT"
+BASE_MODEL_PATH = "RLHF-And-Friends/TLDR-Mistral-7B-SmallSFT-PPO"
 BASE_MODEL_NAME = BASE_MODEL_PATH.split('/')[1]
 # -------------------------------------------------------------------------------------------------
 
 # Fine-tuned model
 # -------------------------------------------------------------------------------------------------
-FT_MODEL_PATH = "RLHF-And-Friends/TLDR-Mistral-7B-SFT-PPO"
+FT_MODEL_PATH = "RLHF-And-Friends/TLDR-Mistral-7B-SmallSFT-CoPPO"
 FT_MODEL_NAME = FT_MODEL_PATH.split('/')[1]
 # -------------------------------------------------------------------------------------------------
 
 # Dataset
 # -------------------------------------------------------------------------------------------------
-DATASET_PATH = "trl-lib/tldr"
+DATASET_PATH = "RLHF-And-Friends/tldr-ppo"
 DATASET_SPLIT = "test"
 PROMPT_FIELD = "prompt"
 SIZE = 100
@@ -55,8 +55,8 @@ ft_completions = get_responses(prompts, FT_MODEL_PATH, batch_size=32)
 responses_dataset = Dataset.from_dict(
     {
         'prompt': prompts, 
-        f'{BASE_MODEL_NAME}': base_completions,
-        f'{FT_MODEL_NAME}': ft_completions
+        'base_completion': base_completions,
+        'ft_completion': ft_completions
     }
 )
 
