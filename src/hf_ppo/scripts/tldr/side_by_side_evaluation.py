@@ -2,7 +2,6 @@ from datasets import load_dataset
 
 from trl import OpenAIPairwiseJudge
 
-from huggingface_hub import HfApi
 
 '''
 set API key in advance:
@@ -15,7 +14,9 @@ export OPENAI_API_KEY=<API key here>
 # #################################################################################################
 
 DATASET_PATH = "RLHF-And-Friends/tldr-TLDR-Mistral-7B-SFT-PPO-completions"
-NUM_SAMPLES = 100
+SPLIT = "test"
+PROMPT_COLUMN = "prompt"
+NUM_SAMPLES_TO_USE = 100
 
 
 # #################################################################################################
@@ -56,13 +57,19 @@ Evaluate the models on the basis of the quality and relevance of their results, 
 # Load responses
 # =================================================================================================
 
-responses_dataset = load_dataset(DATASET_PATH)["test"].select(range(NUM_SAMPLES))
+responses_dataset = load_dataset(DATASET_PATH)[SPLIT].select(range(NUM_SAMPLES_TO_USE))
 
-prompts = list(responses_dataset['prompt'])
+column_names = responses_dataset.column_names
+completion_columns = [
+    column_name for column_name in column_names if column_name != PROMPT_COLUMN
+]
+assert len(completion_columns) == 2
+
+prompts = list(responses_dataset[PROMPT_COLUMN])
 completions = [
-    [base_completion, ft_completion] 
-    for base_completion, ft_completion in zip(
-        responses_dataset['base_completion'], responses_dataset['ft_completions']
+    [lhs, rhs]
+    for lhs, rhs in zip(
+        responses_dataset[completion_columns[0]], responses_dataset[completion_columns[1]]
     )
 ]
 
@@ -81,25 +88,3 @@ gpt_judgements = gpt_judge.judge(prompts, completions, shuffle_order=False)
 gpt_winrate = sum(gpt_judgements) / len(gpt_judgements)
 
 print(f"GPT-judged winrate: {gpt_winrate}")
-
-
-# Add winrate metric to README.md
-# =================================================================================================
-
-readme_text = f"""---
-language: en
-metrics:
-  - GPT-based winrate: {gpt_winrate}
----
-
-Winrate based on {MODEL_TO_USE} opinion: {gpt_winrate}.
-"""
-
-api = HfApi()
-api.upload_file(
-    path_or_fileobj=readme_text.encode(),  # Convert string to bytes
-    path_in_repo="README.md",
-    repo_id=DATASET_PATH,
-    repo_type="dataset",
-    commit_message="Add evaluation metric to README"
-)

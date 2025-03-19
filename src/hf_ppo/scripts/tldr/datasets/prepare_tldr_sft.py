@@ -1,7 +1,6 @@
 from datasets import load_dataset
 
 from hf_ppo.utils import push_dataset_to_hub_with_retries
-from hf_ppo.scripts.datasets.data_utils import cat_columns_contents
 
 
 # Load dataset
