@@ -3,7 +3,7 @@ from __future__ import annotations
 import typing as tp
 
 import time
-from tqdm import tqdm
+from tqdm import trange
 
 from dataclasses import dataclass
 
@@ -15,6 +15,8 @@ from datasets import Dataset
 from transformers import (
     Trainer, AutoModelForCausalLM, AutoTokenizer, pipeline
 )
+
+from trl import BaseJudge
 
 
 # =================================================================================================
@@ -155,8 +157,8 @@ def get_responses(
         inputs = prompts
 
     responses = []
-    for idx in tqdm(
-        range(0, len(inputs), batch_size), desc=f'{model_path} inference'
+    for idx in trange(
+        0, len(inputs), batch_size, desc=f'{model_path} inference'
     ):
         batch = inputs[idx:idx+batch_size]
         responses.extend(text_generator(batch))
@@ -171,3 +173,46 @@ def get_responses(
         ]
 
     return text_responses
+
+
+# Judge with not exceedeing TPM limit
+# =================================================================================================
+
+def judge_with_tpm_limit(
+    judge: BaseJudge,
+    prompts: list[str],
+    completions: list[list[str]],
+    shuffle_order: bool = False,
+    batch_size: int = 100
+) -> list[int]:
+    total_length = len(completions)
+
+    num_batches = total_length // batch_size
+    last_batch_size = total_length % batch_size
+    if last_batch_size != 0:
+        num_batches += 1
+
+    judgements = []
+    for batch_idx in trange(
+        num_batches,
+        desc="Evaluating with timeouts to avoid exceeding token per minute limit.."
+    ):
+        batch_start_idx = batch_idx * batch_size
+
+        if batch_idx != num_batches - 1:
+            batch_end_idx = batch_idx * batch_size + batch_size
+        else:
+            batch_end_idx = batch_size * num_batches
+
+        prompts_batch = prompts[batch_start_idx : batch_end_idx]
+        completions_batch = completions[batch_start_idx : batch_end_idx]
+        
+        batch_judges = judge.judge(
+            prompts_batch, completions_batch, shuffle_order
+        )
+        
+        judgements.extend(batch_judges)
+        
+        time.sleep(60) # wait 1 minute to fit into TPM limit
+        
+    return judgements
