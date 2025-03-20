@@ -26,7 +26,7 @@ RHS_MODEL_NAME = RHS_MODEL_PATH.split('/')[1]
 DATASET_PATH = "RLHF-And-Friends/tldr-ppo"
 DATASET_SPLIT = "test"
 PROMPT_FIELD = "prompt"
-SIZE = 100
+SIZE = 1000
 # -------------------------------------------------------------------------------------------------
 DATASET_NAME = DATASET_PATH.split('/')[1]
 
