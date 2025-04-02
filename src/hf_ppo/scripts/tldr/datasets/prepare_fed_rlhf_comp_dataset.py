@@ -12,7 +12,8 @@ from hf_ppo.data_utils import cat_columns_contents
 
 # Model
 # -------------------------------------------------------------------------------------------------
-MODEL_PATH = "RLHF-And-Friends/TLDR-Mistral-7B-SmallSFT-CoPPO"
+MODEL_PATH = "borisshapa/ppo-8x-mistral-7b-smallsft-tldr"
+TOKENIZER_PATH = "RLHF-And-Friends/TLDR-Mistral-7B-SmallSFT"
 # -------------------------------------------------------------------------------------------------
 MODEL_NAME = MODEL_PATH.split('/')[1]
 
@@ -27,7 +28,7 @@ DATASET_NAME = DATASET_PATH.split('/')[1]
 
 # HF repo
 # -------------------------------------------------------------------------------------------------
-HF_REPO_ID = "RLHF-And-Friends/Human-vs-CoPPO-TLDR-Mistral-7B-SmallSFT"
+HF_REPO_ID = "RLHF-And-Friends/Human-vs-Shapa-8x"
 
 README_TEXT = f"""---
 tags: [rlhf, tldr, radfan]
@@ -70,7 +71,12 @@ prompts = list(test_dataset[PROMPT_FIELD])
 # Inference
 # =================================================================================================
 
-model_completions = get_responses(prompts, MODEL_PATH, batch_size=32)
+model_completions = get_responses(
+    prompts=prompts,
+    model_path=MODEL_PATH,
+    tokenizer_path=TOKENIZER_PATH,
+    batch_size=32
+)
 
 
 # Save responses as dataset

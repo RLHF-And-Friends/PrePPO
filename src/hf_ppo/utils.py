@@ -130,6 +130,7 @@ def push_dataset_to_hub_with_retries(
 def get_responses(
     prompts: list[str],
     model_path: str,
+    tokenizer_path: str | None = None,
     batch_size: int = 8,
     max_new_tokens: int = 512,
     is_chat_model: bool = False,
@@ -139,7 +140,11 @@ def get_responses(
         model_path,
         torch_dtype = torch.bfloat16,
     )
-    tokenizer = AutoTokenizer.from_pretrained(model_path, padding_side="left")
+    if tokenizer_path is None:
+        tokenizer = AutoTokenizer.from_pretrained(model_path, padding_side="left")
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_path, padding_side="left")
+
     tokenizer.pad_token_id = tokenizer.eos_token_id
 
     text_generator = pipeline(
