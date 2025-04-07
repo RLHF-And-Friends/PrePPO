@@ -11,15 +11,15 @@ from hf_ppo.utils import get_responses, push_dataset_to_hub_with_retries
 
 # LHS model
 # -------------------------------------------------------------------------------------------------
-LHS_MODEL_PATH = "RLHF-And-Friends/TLDR-Mistral-7B-SFT"
+LHS_MODEL_PATH = "RLHF-And-Friends/TLDR-Llama-3.1-8B-Base-PPO"
 LHS_TOKENIZER_PATH = None
 # -------------------------------------------------------------------------------------------------
 LHS_MODEL_NAME = LHS_MODEL_PATH.split('/')[1]
 
 # RHS model
 # -------------------------------------------------------------------------------------------------
-RHS_MODEL_PATH = "borisshapa/ppo-8x-mistral-7b-smallsft-tldr"
-RHS_TOKENIZER_PATH = "RLHF-And-Friends/TLDR-Mistral-7B-SFT"
+RHS_MODEL_PATH = "meta-llama/Meta-Llama-3-8B"
+RHS_TOKENIZER_PATH = None
 # -------------------------------------------------------------------------------------------------
 RHS_MODEL_NAME = RHS_MODEL_PATH.split('/')[1]
 
@@ -34,7 +34,7 @@ DATASET_NAME = DATASET_PATH.split('/')[1]
 
 # HF repo
 # -------------------------------------------------------------------------------------------------
-HF_REPO_ID = "RLHF-And-Friends/SFT-vs-Shapa-CoPPO-8x"
+HF_REPO_ID = "RLHF-And-Friends/Llama-Base-TLDR-PPO-vs-Llama-Base"
 
 README_TEXT = f"""---
 tags: [rlhf, tldr, radfan]

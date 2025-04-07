@@ -1,4 +1,4 @@
-from datasets import load_dataset, Dataset
+from datasets import load_dataset
 
 from huggingface_hub import HfApi
 
@@ -12,8 +12,8 @@ from hf_ppo.data_utils import cat_columns_contents
 
 # Model
 # -------------------------------------------------------------------------------------------------
-MODEL_PATH = "borisshapa/ppo-8x-mistral-7b-smallsft-tldr"
-TOKENIZER_PATH = "RLHF-And-Friends/TLDR-Mistral-7B-SmallSFT"
+MODEL_PATH = "RLHF-And-Friends/TLDR-Llama-3.1-8B-Base-PPO"
+TOKENIZER_PATH = None
 # -------------------------------------------------------------------------------------------------
 MODEL_NAME = MODEL_PATH.split('/')[1]
 
@@ -28,7 +28,7 @@ DATASET_NAME = DATASET_PATH.split('/')[1]
 
 # HF repo
 # -------------------------------------------------------------------------------------------------
-HF_REPO_ID = "RLHF-And-Friends/Human-vs-Shapa-8x"
+HF_REPO_ID = "RLHF-And-Friends/Humans-vs-Llama-Base-PPO"
 
 README_TEXT = f"""---
 tags: [rlhf, tldr, radfan]
