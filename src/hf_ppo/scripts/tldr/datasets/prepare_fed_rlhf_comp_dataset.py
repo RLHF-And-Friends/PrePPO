@@ -12,7 +12,7 @@ from hf_ppo.data_utils import cat_columns_contents
 
 # Model
 # -------------------------------------------------------------------------------------------------
-MODEL_PATH = "RLHF-And-Friends/TLDR-Llama-3.1-8B-Base-PPO"
+MODEL_PATH = "RLHF-And-Friends/TLDR-Llama-3.1-8B-SmallSFT-PPO"
 TOKENIZER_PATH = None
 # -------------------------------------------------------------------------------------------------
 MODEL_NAME = MODEL_PATH.split('/')[1]
@@ -28,7 +28,7 @@ DATASET_NAME = DATASET_PATH.split('/')[1]
 
 # HF repo
 # -------------------------------------------------------------------------------------------------
-HF_REPO_ID = "RLHF-And-Friends/Humans-vs-Llama-Base-PPO"
+HF_REPO_ID = "RLHF-And-Friends/Humans-vs-Llama-SmallSFT-PPO"
 
 README_TEXT = f"""---
 tags: [rlhf, tldr, radfan]

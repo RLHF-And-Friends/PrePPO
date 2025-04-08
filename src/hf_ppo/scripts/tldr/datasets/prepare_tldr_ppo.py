@@ -1,4 +1,4 @@
-from datasets import load_dataset
+from datasets import load_dataset, DatasetDict
 
 from hf_ppo.utils import push_dataset_to_hub_with_retries
 
@@ -22,25 +22,18 @@ train_dataset = train_dataset.remove_columns("completion")
 eval_dataset = eval_dataset.remove_columns("completion")
 test_dataset = test_dataset.remove_columns("completion")
 
+new_dataset = DatasetDict({
+    "train": train_dataset,
+    "validation": eval_dataset,
+    "test": test_dataset
+})
+
 # Push dataset to hub
 # =================================================================================================
 
 NEW_DATASET_NAME = "tldr-ppo"
 
 push_dataset_to_hub_with_retries(
-    train_dataset,
+    new_dataset,
     repo_id=f"RLHF-And-Friends/{NEW_DATASET_NAME}",
-    split="train"
-)
-
-push_dataset_to_hub_with_retries(
-    eval_dataset,
-    repo_id=f"RLHF-And-Friends/{NEW_DATASET_NAME}",
-    split="validation"
-)
-
-push_dataset_to_hub_with_retries(
-    test_dataset,
-    repo_id=f"RLHF-And-Friends/{NEW_DATASET_NAME}",
-    split="test"
 )

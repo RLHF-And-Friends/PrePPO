@@ -1,4 +1,4 @@
-from datasets import load_dataset
+from datasets import load_dataset, DatasetDict
 
 from hf_ppo.utils import push_dataset_to_hub_with_retries
 from hf_ppo.data_utils import cat_columns_contents
@@ -37,19 +37,17 @@ eval_dataset = eval_dataset.map(
     load_from_cache_file=False,
 )
 
+new_dataset = DatasetDict({
+    "train": train_dataset,
+    "validation": eval_dataset,
+})
+
 # Push dataset to hub
 # =================================================================================================
 
 NEW_DATASET_NAME = "tldr-preference"
 
 push_dataset_to_hub_with_retries(
-    train_dataset,
+    new_dataset,
     repo_id=f"RLHF-And-Friends/{NEW_DATASET_NAME}",
-    split="train"
-)
-
-push_dataset_to_hub_with_retries(
-    eval_dataset,
-    repo_id=f"RLHF-And-Friends/{NEW_DATASET_NAME}",
-    split="validation"
 )
