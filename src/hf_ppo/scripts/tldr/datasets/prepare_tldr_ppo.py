@@ -21,6 +21,12 @@ new_dataset = DatasetDict({
     "test": test_dataset
 })
 
+new_dataset = DatasetDict({
+    "train": train_dataset,
+    "validation": eval_dataset,
+    "test": test_dataset
+})
+
 # Push dataset to hub
 # =================================================================================================
 

@@ -3,6 +3,7 @@ import os
 import torch
 
 from datasets import load_dataset
+from tokenizers import processors
 
 from transformers import (
     AutoModelForSequenceClassification, AutoTokenizer
@@ -29,7 +30,7 @@ from hf_ppo.utils import (
 
 # Model path
 # =================================================================================================
-MODEL_PATH = "RLHF-And-Friends/TLDR-Mistral-7B-SmallSFT"
+MODEL_PATH = "RLHF-And-Friends/TLDR-Llama-3.1-8B-SmallSFT"
 MODEL_NAME = MODEL_PATH.split('/')[1]
 
 # Dataset path
@@ -134,8 +135,20 @@ initial_tokenizer = AutoTokenizer.from_pretrained(
 
 tokenizer = AutoTokenizer.from_pretrained(
     model_config.model_name_or_path,
-    pad_token = "<pad>",
-    add_eos_token = True, # To add EOS token during tokenization
+    pad_token = "<|pad|>",
+    add_eos_token = True, # To add EOS token during tokenization (does not work for Llama3 tokenizer)
+)
+
+# Add postrprocessor to add EOS token (Only for Llama3 model!!!)
+# -------------------------------------------------------------------------------------------------
+
+tokenizer._tokenizer.post_processor = processors.TemplateProcessing(
+    single=f"{tokenizer.bos_token}:0 $A:0 {tokenizer.eos_token}:0",
+    pair=f"{tokenizer.bos_token}:0 $A:0 {tokenizer.bos_token}:1 $B:1 {tokenizer.eos_token}:1",
+    special_tokens=[
+        (tokenizer.bos_token, tokenizer.bos_token_id),
+        (tokenizer.eos_token, tokenizer.eos_token_id),
+    ],
 )
 
 # Model

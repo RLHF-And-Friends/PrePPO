@@ -9,15 +9,17 @@ from hf_ppo.utils import get_responses, push_dataset_to_hub_with_retries
 # NAMES & PATHS
 # #################################################################################################
 
-# Base model
+# LHS model
 # -------------------------------------------------------------------------------------------------
-LHS_MODEL_PATH = "RLHF-And-Friends/TLDR-Mistral-7B-SmallSFT-PPO"
+LHS_MODEL_PATH = "RLHF-And-Friends/TLDR-Llama-3.1-8B-Base-PPO"
+LHS_TOKENIZER_PATH = None
 # -------------------------------------------------------------------------------------------------
 LHS_MODEL_NAME = LHS_MODEL_PATH.split('/')[1]
 
-# Fine-tuned model
+# RHS model
 # -------------------------------------------------------------------------------------------------
-RHS_MODEL_PATH = "RLHF-And-Friends/TLDR-Mistral-7B-SmallSFT-CoPPO"
+RHS_MODEL_PATH = "meta-llama/Meta-Llama-3-8B"
+RHS_TOKENIZER_PATH = None
 # -------------------------------------------------------------------------------------------------
 RHS_MODEL_NAME = RHS_MODEL_PATH.split('/')[1]
 
@@ -26,13 +28,13 @@ RHS_MODEL_NAME = RHS_MODEL_PATH.split('/')[1]
 DATASET_PATH = "RLHF-And-Friends/tldr-ppo"
 DATASET_SPLIT = "test"
 PROMPT_FIELD = "prompt"
-SIZE = 1000
+SIZE = 100
 # -------------------------------------------------------------------------------------------------
 DATASET_NAME = DATASET_PATH.split('/')[1]
 
 # HF repo
 # -------------------------------------------------------------------------------------------------
-HF_REPO_ID = "RLHF-And-Friends/PPO-vs-CoPPO-TLDR-Mistral-7B-SmallSFT"
+HF_REPO_ID = "RLHF-And-Friends/Llama-Base-TLDR-PPO-vs-Llama-Base"
 
 README_TEXT = f"""---
 tags: [rlhf, tldr, radfan]
@@ -65,8 +67,18 @@ prompts = list(test_dataset[PROMPT_FIELD])
 # Inference
 # =================================================================================================
 
-lhs_completions = get_responses(prompts, LHS_MODEL_PATH, batch_size=32)
-rhs_completions = get_responses(prompts, RHS_MODEL_PATH, batch_size=32)
+lhs_completions = get_responses(
+    prompts=prompts,
+    model_path=LHS_MODEL_PATH,
+    tokenizer_path=LHS_TOKENIZER_PATH,
+    batch_size=32
+)
+rhs_completions = get_responses(
+    prompts=prompts,
+    model_path=RHS_MODEL_PATH,
+    tokenizer_path=RHS_TOKENIZER_PATH,
+    batch_size=32
+)
 
 
 # Save responses as dataset

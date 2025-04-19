@@ -3,6 +3,7 @@ import os
 import torch
 
 from datasets import load_dataset
+from tokenizers import processors
 
 from transformers import (
     AutoModelForCausalLM, AutoTokenizer
@@ -28,7 +29,7 @@ from hf_ppo.utils import push_to_hub_with_retries
 
 # Model path
 # =================================================================================================
-MODEL_PATH = "mistral-community/Mistral-7B-v0.2"
+MODEL_PATH = "meta-llama/Llama-3.1-8B"
 MODEL_NAME = MODEL_PATH.split('/')[1]
 
 # Dataset path
@@ -133,9 +134,21 @@ initial_tokenizer = AutoTokenizer.from_pretrained(
 
 tokenizer = AutoTokenizer.from_pretrained(
     model_config.model_name_or_path,
-    pad_token = "<pad>",
-    add_eos_token = True, # To add EOS token during tokenization with `add_sepcial_tokens = True``
+    pad_token = "<|pad|>",
+    add_eos_token = True, # To add EOS token during tokenization
     padding_side = "right",
+)
+
+# Add postrprocessor to add EOS token (Obligatory for Llama3.1 model only)
+# -------------------------------------------------------------------------------------------------
+
+tokenizer._tokenizer.post_processor = processors.TemplateProcessing(
+    single=f"{tokenizer.bos_token}:0 $A:0 {tokenizer.eos_token}:0",
+    pair=f"{tokenizer.bos_token}:0 $A:0 {tokenizer.bos_token}:1 $B:1 {tokenizer.eos_token}:1",
+    special_tokens=[
+        (tokenizer.bos_token, tokenizer.bos_token_id),
+        (tokenizer.eos_token, tokenizer.eos_token_id),
+    ],
 )
 
 # Model
@@ -193,7 +206,8 @@ eval_dataset = dataset[DATASET_VAL_SPLIT].select(range(EVAL_SIZE))
 # =================================================================================================
 
 masking_collator = DataCollatorForCompletionOnlyLM(
-    response_template=[11521, 28745, 4232, 28747],
+    # response_template=[11521, 28745, 4232, 28747], # Mistral
+    response_template="TL;DR:",
     tokenizer = tokenizer
 )
 
