@@ -14,7 +14,7 @@ export OPENAI_API_KEY=<API key here>
 # NAMES & PATHS
 # #################################################################################################
 
-DATASET_PATH = "RLHF-And-Friends/PPO-vs-CoPPO-TLDR-Mistral-7B-SmallSFT"
+DATASET_PATH = "RLHF-And-Friends/Humans-vs-Llama-SmallSFT-PPO"
 SPLIT = "test"
 PROMPT_COLUMN = "prompt"
 NUM_SAMPLES_TO_USE = 1000
