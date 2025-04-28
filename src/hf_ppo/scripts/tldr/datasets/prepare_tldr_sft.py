@@ -6,7 +6,7 @@ from hf_ppo.utils import push_dataset_to_hub_with_retries
 # Load dataset
 # =================================================================================================
 
-TRAIN_SIZE = 20000
+TRAIN_SIZE = 16722
 EVAL_SIZE  = 2000
 
 dataset = load_dataset("trl-lib/tldr")
