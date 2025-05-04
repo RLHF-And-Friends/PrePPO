@@ -30,7 +30,7 @@ from hf_ppo.utils import (
 
 # Model path
 # =================================================================================================
-MODEL_PATH = "RLHF-And-Friends/TLDR-Llama-3.1-8B-SmallSFT"
+MODEL_PATH = "RLHF-And-Friends/TLDR-Llama-3.2-3B-SmallSFT"
 MODEL_NAME = MODEL_PATH.split('/')[1]
 
 # Dataset path

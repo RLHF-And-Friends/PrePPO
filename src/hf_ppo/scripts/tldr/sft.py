@@ -29,7 +29,7 @@ from hf_ppo.utils import push_to_hub_with_retries
 
 # Model path
 # =================================================================================================
-MODEL_PATH = "meta-llama/Llama-3.1-8B"
+MODEL_PATH = "meta-llama/Llama-3.2-3B"
 MODEL_NAME = MODEL_PATH.split('/')[1]
 
 # Dataset path
@@ -54,8 +54,8 @@ os.environ["WANDB_ENTITY"]  = "RADFAN"
 # CONFIGS
 ###################################################################################################
 
-TRAIN_SIZE  = 20000
-EVAL_SIZE   = 2000
+TRAIN_SIZE  = 16722
+EVAL_SIZE   = 1500
 
 # Model config
 # =================================================================================================
@@ -135,21 +135,21 @@ initial_tokenizer = AutoTokenizer.from_pretrained(
 tokenizer = AutoTokenizer.from_pretrained(
     model_config.model_name_or_path,
     pad_token = "<|pad|>",
-    add_eos_token = True, # To add EOS token during tokenization
+    # add_eos_token = True, # To add EOS token during tokenization
     padding_side = "right",
 )
 
-# Add postrprocessor to add EOS token (Obligatory for Llama3.1 model only)
+# Add postrprocessor to add EOS token (Obligatory for Llama3 models only)
 # -------------------------------------------------------------------------------------------------
 
-tokenizer._tokenizer.post_processor = processors.TemplateProcessing(
-    single=f"{tokenizer.bos_token}:0 $A:0 {tokenizer.eos_token}:0",
-    pair=f"{tokenizer.bos_token}:0 $A:0 {tokenizer.bos_token}:1 $B:1 {tokenizer.eos_token}:1",
-    special_tokens=[
-        (tokenizer.bos_token, tokenizer.bos_token_id),
-        (tokenizer.eos_token, tokenizer.eos_token_id),
-    ],
-)
+# tokenizer._tokenizer.post_processor = processors.TemplateProcessing(
+#     single=f"{tokenizer.bos_token}:0 $A:0 {tokenizer.eos_token}:0",
+#     pair=f"{tokenizer.bos_token}:0 $A:0 {tokenizer.bos_token}:1 $B:1 {tokenizer.eos_token}:1",
+#     special_tokens=[
+#         (tokenizer.bos_token, tokenizer.bos_token_id),
+#         (tokenizer.eos_token, tokenizer.eos_token_id),
+#     ],
+# )
 
 # Model
 # =================================================================================================
@@ -205,11 +205,11 @@ eval_dataset = dataset[DATASET_VAL_SPLIT].select(range(EVAL_SIZE))
 # Data collator to mask prompt labels
 # =================================================================================================
 
-masking_collator = DataCollatorForCompletionOnlyLM(
-    # response_template=[11521, 28745, 4232, 28747], # Mistral
-    response_template="TL;DR:",
-    tokenizer = tokenizer
-)
+# masking_collator = DataCollatorForCompletionOnlyLM(
+#     # response_template=[11521, 28745, 4232, 28747], # Mistral
+#     response_template="TL;DR:",
+#     tokenizer = tokenizer
+# )
 
 ###################################################################################################
 # TRAINING
@@ -224,7 +224,7 @@ def main() -> None:
         args             = training_args,
         train_dataset    = train_dataset,
         eval_dataset     = eval_dataset,
-        data_collator    = masking_collator,
+        # data_collator    = masking_collator,
     )
     trainer.train()
 
