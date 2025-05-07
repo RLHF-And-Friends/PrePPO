@@ -12,14 +12,14 @@ train_dataset = dataset["train"]
 validation_dataset = dataset["validation"]
 
 
-# Leave only code domain
+# Leave only multilingual domain
 # =================================================================================================
 
 code_train_dataset = train_dataset.filter(
-    lambda row: row["domain"] == "code"
+    lambda row: row["domain"] == "multilingual"
 )
 code_validation_dataset = validation_dataset.filter(
-    lambda row: row["domain"] == "code"
+    lambda row: row["domain"] == "multilingual"
 )
 
 
@@ -42,7 +42,7 @@ print(
 )
 
 
-# Make new dataset with the subset for each language keeping best response
+# Make new dataset with the subset for each language
 # =================================================================================================
 
 def choose_best_response(sample):
@@ -80,7 +80,7 @@ for language in train_languages:
 # Loaad new dataset to hub
 # =================================================================================================
 
-repo_id = "RLHF-And-Friends/helpsteer3-code"
+repo_id = "RLHF-And-Friends/helpsteer3-multilingual"
 
 for language, subset in subsets.items():
     subset.push_to_hub(repo_id, config_name=language)
