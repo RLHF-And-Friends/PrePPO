@@ -30,7 +30,7 @@ def get_available_languages(dataset: Dataset) -> tp.Set[str]:
     available_languages = set()
     for row in dataset:
         available_languages.add(row["language"])
-        
+
     return available_languages
 
 train_languages = get_available_languages(code_train_dataset)
