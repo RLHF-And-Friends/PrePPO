@@ -27,7 +27,7 @@ dependencies = [
 	# logging
 	"wandb",
 	# evaluation judge
-	"openai"
+	"openai",
 	# inference
 	"vllm"
 ]
