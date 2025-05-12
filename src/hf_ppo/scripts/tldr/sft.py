@@ -244,7 +244,7 @@ def main() -> None:
     # ---------------------------------------------------------------------------------------------
     trainer.model = trainer.model.merge_and_unload()
     
-    # Set initial generation config
+    # Set initial model config
     # ---------------------------------------------------------------------------------------------
     trainer.model.config = initial_model_config
 
