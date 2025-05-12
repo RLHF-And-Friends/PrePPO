@@ -234,11 +234,11 @@ def main() -> None:
 
     # Delete PAD token from the model's vocabulary
     # ---------------------------------------------------------------------------------------------
-    trainer.model.resize_token_embeddings(len(tokenizer) - 1)
+    trainer.model.resize_token_embeddings(len(initial_tokenizer))
 
     # Revert tokenizer to the initial state
     # ---------------------------------------------------------------------------------------------
-    trainer.tokenizer = initial_tokenizer
+    trainer.processing_class = initial_tokenizer
 
     # Merge LoRA adapters into the model
     # ---------------------------------------------------------------------------------------------
