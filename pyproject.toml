@@ -28,6 +28,8 @@ dependencies = [
 	"wandb",
 	# evaluation judge
 	"openai"
+	# inference
+	"vllm"
 ]
 
 [tool.ruff]

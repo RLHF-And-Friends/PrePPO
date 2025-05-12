@@ -1,5 +1,7 @@
 import os
 
+import copy
+
 import torch
 
 from datasets import load_dataset
@@ -181,6 +183,9 @@ if model_config.load_in_4bit or model_config.load_in_8bit:
 # -------------------------------------------------------------------------------------------------
 
 model.resize_token_embeddings(len(tokenizer), mean_resizing=False)
+
+initial_model_config = copy.deepcopy(model.config)
+
 model.config.pad_token_id = tokenizer.pad_token_id
 
 # Wrap in LoRA
@@ -238,6 +243,10 @@ def main() -> None:
     # Merge LoRA adapters into the model
     # ---------------------------------------------------------------------------------------------
     trainer.model = trainer.model.merge_and_unload()
+    
+    # Set initial generation config
+    # ---------------------------------------------------------------------------------------------
+    trainer.model.config = initial_model_config
 
     # Push model to hub with retries
     # ---------------------------------------------------------------------------------------------
