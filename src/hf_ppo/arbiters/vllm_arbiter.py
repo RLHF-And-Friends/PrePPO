@@ -71,9 +71,10 @@ class LocalVLLMArbiter(PairwiseArbiter):
         self,
         system_prompt: str,
         model: str = "Qwen/Qwen3-32B",
+        **model_kwargs,
     ) -> None:
         self._system_prompt = system_prompt
-        self._llm = LLM(model)
+        self._llm = LLM(model, **model_kwargs)
 
     def get_ranks(self, prompts, completions):
         judge_prompts = [
