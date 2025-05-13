@@ -6,7 +6,7 @@ from datasets import (
 )
 
 from hf_ppo.utils import push_dataset_to_hub_with_retries
-from hf_ppo.data_utils import cat_columns_contents
+from hf_ppo.data_utils import cat_columns_contents, append_tldr
 
 
 # Load dataset
@@ -25,9 +25,7 @@ for config in all_configs:
         name="language",
         column=[config]*len(train_subset)
     )
-    train_subset["text"] = [
-        train_text + "\n\nTL;DR: " for train_text in train_subset["text"]
-    ]
+    train_subset = train_subset.map(append_tldr, fn_kwargs={"column": "text"})
     train_subsets.append(train_subset)
 
     # Validation subset
@@ -37,9 +35,7 @@ for config in all_configs:
         name="language",
         column=[config]*len(validation_subset)
     )
-    validation_subset["text"] = [
-        validation_text + "\n\nTL;DR: " for validation_text in validation_subset["text"]
-    ]
+    validation_subset = validation_subset.map(append_tldr, fn_kwargs={"column": "text"})
     validation_subsets.append(validation_subset)
 
 train_dataset = concatenate_datasets(train_subsets)

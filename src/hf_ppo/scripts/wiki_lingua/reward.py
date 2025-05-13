@@ -1,5 +1,7 @@
 import os
 
+import copy
+
 import torch
 
 from datasets import load_dataset
@@ -36,15 +38,14 @@ MODEL_NAME = MODEL_PATH.split('/')[1]
 # Dataset path
 # =================================================================================================
 DATASET_PATH        = "RLHF-And-Friends/wiki-lingua-reward"
-CONFIGURATIONS      = ["en", "ru", "de", "fr", "es", "it", "nl"]
 DATASET_TRAIN_SPLIT = "train"
 DATASET_VAL_SPLIT   = "validation"
 DATASET_NAME        = DATASET_PATH.split('/')[1]
 
 # Project name
 # =================================================================================================
-PROJECT_NAME = "RM-TLDR"
-EXP_NAME = f"{MODEL_NAME}"
+PROJECT_NAME = "RM-WIKI-LINGUA"
+EXP_NAME = f"{MODEL_NAME}-lr-5e-6"
 
 # WandB
 # =================================================================================================
@@ -56,7 +57,7 @@ os.environ["WANDB_ENTITY"]  = "RADFAN"
 # CONFIGS
 # #################################################################################################
 
-TRAIN_SIZE  = 92858
+TRAIN_SIZE  = 70000
 EVAL_SIZE   = 2000
 
 # Model config
@@ -109,7 +110,7 @@ training_args = RewardConfig(
     
     # Optimizer
     # ---------------------------------------------------------------------------------------------
-    learning_rate = 1e-5,
+    learning_rate = 5e-6,
 
     # Logs
     # ---------------------------------------------------------------------------------------------
@@ -172,6 +173,8 @@ model = AutoModelForSequenceClassification.from_pretrained(
     torch_dtype = torch_dtype,
 )
 
+initial_model_config = copy.deepcopy(model.config)
+
 if model_config.load_in_4bit or model_config.load_in_8bit:
     model = prepare_model_for_kbit_training(
         model,
@@ -221,11 +224,16 @@ def main() -> None:
 
     # Revert tokenizer to the initial state
     # ---------------------------------------------------------------------------------------------
-    trainer.tokenizer = initial_tokenizer
+    trainer.processing_class = initial_tokenizer
 
     # Merge LoRA adapters into the model
     # ---------------------------------------------------------------------------------------------
     trainer.model = trainer.model.merge_and_unload()
+
+    # Set initial model config
+    # ---------------------------------------------------------------------------------------------
+
+    trainer.model.config = initial_model_config
 
     # Push model to hub
     # ---------------------------------------------------------------------------------------------

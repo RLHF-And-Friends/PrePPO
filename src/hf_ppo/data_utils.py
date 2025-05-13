@@ -85,3 +85,11 @@ def cat_columns_contents(
         element[cat_column_name] = element[lhs_column_name] + element[rhs_column_name]
         
     return element
+
+# Append TL;DR function
+# -------------------------------------------------------------------------------------------------
+
+def append_tldr(element, column: str):
+    element[column] += "\n\nTL;DR: "
+
+    return element

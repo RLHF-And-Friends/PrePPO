@@ -172,6 +172,7 @@ model = AutoModelForCausalLM.from_pretrained(
     quantization_config = quantization_config,
     torch_dtype = torch_dtype,
 )
+initial_model_config = copy.deepcopy(model.config)
 
 if model_config.load_in_4bit or model_config.load_in_8bit:
     model = prepare_model_for_kbit_training(
@@ -183,8 +184,6 @@ if model_config.load_in_4bit or model_config.load_in_8bit:
 # -------------------------------------------------------------------------------------------------
 
 model.resize_token_embeddings(len(tokenizer), mean_resizing=False)
-
-initial_model_config = copy.deepcopy(model.config)
 
 model.config.pad_token_id = tokenizer.pad_token_id
 
