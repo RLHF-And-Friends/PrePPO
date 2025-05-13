@@ -14,7 +14,7 @@ from vllm import SamplingParams
 # -------------------------------------------------------------------------------------------------
 
 DATASET_PATH = "RLHF-And-Friends/wiki_lingua_paired"
-CONFIGURATIONS = ["en"]#, "ru", "de", "fr", "es", "it", "nl"]
+CONFIGURATIONS = ["en", "ru", "de", "fr", "es", "it", "nl"]
 TEXTS_COLUMN = "text"
 SUMMARIES_COLUMNS = ["summary_a", "summary_b"]
 SPLITS = ["train", "validation"]
@@ -25,12 +25,23 @@ TARGET_DATASET_PATH = "RLHF-And-Friends/wiki_lingua_preference"
 # -------------------------------------------------------------------------------------------------
 
 JUDGE_PATH = "Qwen/Qwen3-32B"
+# Thinking params
+# SAMPLING_PARAMS = SamplingParams(
+#     max_tokens=32768,
+#     temperature=0.6,
+#     top_p=0.95,
+#     top_k=20,
+# )
+# No thinking params
 SAMPLING_PARAMS = SamplingParams(
-    max_tokens=1024
+    max_tokens=8192,
+    temperature=0.7,
+    top_p=0.8,
+    top_k=20,
 )
-MAX_MODEL_LEN = 4096
+MAX_MODEL_LEN = 8192
 
-JUDGE_PROMPT = '''You are evaluating the performance of different language models on a summarization task. Each model is given a piece of wikipedia article and tasked with generating a concise and accurate summary. Your job is to compare the outputs and select the model that produces the best summary from a human perspective.
+JUDGE_PROMPT = '''/no_think You are evaluating the performance of different language models on a summarization task. Each model is given a piece of wikipedia article and tasked with generating a concise and accurate summary. Your job is to compare the outputs and select the model that produces the best summary from a human perspective.
 
 ## Text
 
@@ -80,7 +91,6 @@ for configuration in tqdm(CONFIGURATIONS, desc="Processing configurations"):
 
         ranks = arbiter.judge(texts, zip(completions_a, completions_b))
         
-        
         chosen = []
         rejected = []
         for rank, (completion_a, completion_b) in zip(
@@ -99,12 +109,15 @@ for configuration in tqdm(CONFIGURATIONS, desc="Processing configurations"):
                     )
                 )
 
-        print(f"Fraction of the samples where the secong summary was prefered: {sum(ranks)}")
+        print(f"Fraction of the samples where the secong summary was prefered: {sum(ranks) / len(ranks)}")
             
         new_dataset_split = Dataset.from_dict({
             "text": texts,
+            "completion_a": completions_a,
+            "completion_b": completions_b,
             "chosen": chosen,
             "rejected": rejected,
+            "rank": ranks,
         })
         
         new_dataset_split.push_to_hub(

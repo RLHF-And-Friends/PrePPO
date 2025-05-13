@@ -94,21 +94,18 @@ class LocalVLLMArbiter(PairwiseArbiter):
             sampling_params=self._sampling_params
         )
 
-        potential_ranks = []
-        for response in judge_responses:
-            print(response.outputs[0].text)
-            potential_ranks.append(response.outputs[0].text[-1])
-
-        # potential_ranks = [response.outputs[0].text[-1] for response in judge_responses]
+        potential_ranks = [
+            response.outputs[0].text.strip()[-1] for response in judge_responses
+        ]
         
         ranks = []
         for potential_rank in potential_ranks:
             if potential_rank in ["0", "1"]:
                 rank = int(potential_rank)
             else:
-                # logging.warning(
-                #     f"Invalid response from the judge model: '{potential_rank}'. Returning -1."
-                # )
+                logging.warning(
+                    f"Invalid response from the judge model: '{potential_rank}'. Returning -1."
+                )
                 rank = -1
             ranks.append(rank)
             

@@ -16,8 +16,8 @@ CONFIGURATIONS = ["en", "ru", "de", "fr", "es", "it", "nl"]
 TEXT_FIELD = "source"
 
 NUM_SAMPLES = {
-    "train": 2000,
-    "validation": 200,
+    "train": 10000,
+    "validation": 1000,
 }
 
 # Target dataset
