@@ -6,7 +6,7 @@ import logging
 
 import numpy as np
 
-from vllm import LLM
+from vllm import LLM, SamplingParams
 
 
 class PairwiseArbiter(ABC):
@@ -71,30 +71,44 @@ class LocalVLLMArbiter(PairwiseArbiter):
         self,
         system_prompt: str,
         model: str = "Qwen/Qwen3-32B",
+        sampling_params: tp.Optional[SamplingParams] = None,
         **model_kwargs,
     ) -> None:
         self._system_prompt = system_prompt
         self._llm = LLM(model, **model_kwargs)
+        self._sampling_params = sampling_params
 
     def get_ranks(self, prompts, completions):
-        judge_prompts = [
-            self._system_prompt.format(
-                text=prompt, response0=completion_a, response1=completion_b
-            ) for prompt, (completion_a, completion_b) in zip(prompts, completions)
+        judge_messages = [
+            [{
+                "role": "user",
+                "content": self._system_prompt.format(
+                    text=prompt, response0=completion_a, response1=completion_b
+                )
+            }]
+            for prompt, (completion_a, completion_b) in zip(prompts, completions)
         ]
 
-        judge_responses = self._llm.generate(judge_prompts)
-        
-        potential_ranks = [response[-1] for response in judge_responses]
+        judge_responses = self._llm.chat(
+            messages=judge_messages,
+            sampling_params=self._sampling_params
+        )
+
+        potential_ranks = []
+        for response in judge_responses:
+            print(response.outputs[0].text)
+            potential_ranks.append(response.outputs[0].text[-1])
+
+        # potential_ranks = [response.outputs[0].text[-1] for response in judge_responses]
         
         ranks = []
         for potential_rank in potential_ranks:
             if potential_rank in ["0", "1"]:
                 rank = int(potential_rank)
             else:
-                logging.warning(
-                    f"Invalid response from the judge model: '{potential_rank}'. Returning -1."
-                )
+                # logging.warning(
+                #     f"Invalid response from the judge model: '{potential_rank}'. Returning -1."
+                # )
                 rank = -1
             ranks.append(rank)
             

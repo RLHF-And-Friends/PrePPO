@@ -1,6 +1,8 @@
-from vllm import LLM, SamplingParams
+from tqdm import tqdm
 
 from datasets import load_dataset, Dataset
+
+from vllm import LLM, SamplingParams
 
 
 # Paths and variables
@@ -9,7 +11,7 @@ from datasets import load_dataset, Dataset
 # Initial dataset
 # -------------------------------------------------------------------------------------------------
 DATASET_PATH = "RLHF-And-Friends/wiki_lingua"
-CONFIGURATION = "en"
+CONFIGURATIONS = ["en", "ru", "de", "fr", "es", "it", "nl"]
 
 TEXT_FIELD = "source"
 
@@ -54,41 +56,40 @@ sampling_params_b = SamplingParams(
 # Generation
 # =================================================================================================
 
-dataset = load_dataset(DATASET_PATH, CONFIGURATION)
+for configuration in tqdm(CONFIGURATIONS, desc="Processing configurations"):
 
-# Train dataset
-# -------------------------------------------------------------------------------------------------
+    dataset = load_dataset(DATASET_PATH, configuration)
 
-for split, split_samples in NUM_SAMPLES.items():
-    split_dataset = dataset[split][:split_samples]
-    split_texts = split_dataset[TEXT_FIELD]
+    for split, split_samples in NUM_SAMPLES.items():
+        split_dataset = dataset[split][:split_samples]
+        split_texts = split_dataset[TEXT_FIELD]
 
-    split_messages = [
-        [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": text}
-        ] for text in split_texts
-    ]
-    outputs_a = generator.chat(
-        split_messages,
-        sampling_params=sampling_params_a,
-    )
-    outputs_b = generator.chat(
-        split_messages,
-        sampling_params = sampling_params_b,
-    )
+        split_messages = [
+            [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": text}
+            ] for text in split_texts
+        ]
+        outputs_a = generator.chat(
+            split_messages,
+            sampling_params=sampling_params_a,
+        )
+        outputs_b = generator.chat(
+            split_messages,
+            sampling_params = sampling_params_b,
+        )
 
-    generated_summaries_a = [output.outputs[0].text for output in outputs_a]
-    generated_summaries_b = [output.outputs[0].text for output in outputs_b]
+        generated_summaries_a = [output.outputs[0].text for output in outputs_a]
+        generated_summaries_b = [output.outputs[0].text for output in outputs_b]
 
-    new_dataset_split = Dataset.from_dict({
-        "text": split_texts,
-        "summary_a": generated_summaries_a,
-        "summary_b": generated_summaries_b,
-    })
+        new_dataset_split = Dataset.from_dict({
+            "text": split_texts,
+            "summary_a": generated_summaries_a,
+            "summary_b": generated_summaries_b,
+        })
 
-    new_dataset_split.push_to_hub(
-        repo_id=TARGET_DATASET_PATH,
-        config_name=CONFIGURATION,
-        split=split
-    )
+        new_dataset_split.push_to_hub(
+            repo_id=TARGET_DATASET_PATH,
+            config_name=configuration,
+            split=split
+        )
