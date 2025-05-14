@@ -2,6 +2,8 @@ from tqdm import tqdm
 
 from datasets import load_dataset, Dataset, get_dataset_split_names
 
+from hf_ppo.data_utils import append_tldr
+
 
 # Paths and variables
 # =================================================================================================
@@ -29,6 +31,9 @@ for configuration in tqdm(CONFIGURATIONS, desc="Processing configurations"):
 
     for split in dataset_split_names:
         split_dataset = dataset[split]
+        
+        split_dataset = split_dataset.map(append_tldr, fn_kwargs={"column": TEXT_FIELD})
+        
         split_texts = split_dataset[TEXT_FIELD]
         split_summaries = split_dataset[SUMMARY_FIELD]
 
