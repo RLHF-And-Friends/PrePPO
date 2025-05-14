@@ -22,7 +22,7 @@ from trl import (
     DataCollatorForCompletionOnlyLM
 )
 
-from hf_ppo.utils import push_to_hub_with_retries
+from pre_ppo.utils import push_to_hub_with_retries
 
 
 ###################################################################################################

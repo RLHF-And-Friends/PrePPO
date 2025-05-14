@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 from datasets import load_dataset, DatasetDict, Dataset
 
-from hf_ppo.utils import push_dataset_to_hub_with_retries
+from pre_ppo.utils import push_dataset_to_hub_with_retries
 
 
 # Load dataset

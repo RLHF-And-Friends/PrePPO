@@ -2,7 +2,7 @@ from tqdm import tqdm
 
 from datasets import load_dataset, Dataset
 
-from hf_ppo.arbiters.vllm_arbiter import LocalVLLMArbiter
+from pre_ppo.arbiters.vllm_arbiter import LocalVLLMArbiter
 
 from vllm import SamplingParams
 

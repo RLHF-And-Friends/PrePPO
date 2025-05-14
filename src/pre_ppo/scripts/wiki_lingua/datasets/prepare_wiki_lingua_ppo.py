@@ -2,7 +2,7 @@ from tqdm import tqdm
 
 from datasets import load_dataset, Dataset, get_dataset_split_names
 
-from hf_ppo.data_utils import append_tldr
+from pre_ppo.data_utils import append_tldr
 
 
 # Paths and variables

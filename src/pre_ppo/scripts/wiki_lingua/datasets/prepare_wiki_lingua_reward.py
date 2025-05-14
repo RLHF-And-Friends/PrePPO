@@ -5,8 +5,8 @@ from datasets import (
     get_dataset_config_names
 )
 
-from hf_ppo.utils import push_dataset_to_hub_with_retries
-from hf_ppo.data_utils import cat_columns_contents, append_tldr
+from pre_ppo.utils import push_dataset_to_hub_with_retries
+from pre_ppo.data_utils import cat_columns_contents, append_tldr
 
 
 # Load dataset

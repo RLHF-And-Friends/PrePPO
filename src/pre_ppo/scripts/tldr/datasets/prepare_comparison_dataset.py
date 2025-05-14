@@ -1,80 +1,82 @@
-from datasets import load_dataset
+from datasets import load_dataset, Dataset
 
 from huggingface_hub import HfApi
 
-from hf_ppo.utils import get_responses, push_dataset_to_hub_with_retries
-from hf_ppo.data_utils import cat_columns_contents
+from pre_ppo.utils import get_responses, push_dataset_to_hub_with_retries
 
 
 # #################################################################################################
 # NAMES & PATHS
 # #################################################################################################
 
-# Model
+# LHS model
 # -------------------------------------------------------------------------------------------------
-MODEL_PATH = "RLHF-And-Friends/TLDR-Llama-3.1-8B-SmallSFT-PPO"
-TOKENIZER_PATH = None
+LHS_MODEL_PATH = "RLHF-And-Friends/TLDR-Llama-3.1-8B-Base-PPO"
+LHS_TOKENIZER_PATH = None
 # -------------------------------------------------------------------------------------------------
-MODEL_NAME = MODEL_PATH.split('/')[1]
+LHS_MODEL_NAME = LHS_MODEL_PATH.split('/')[1]
+
+# RHS model
+# -------------------------------------------------------------------------------------------------
+RHS_MODEL_PATH = "meta-llama/Meta-Llama-3-8B"
+RHS_TOKENIZER_PATH = None
+# -------------------------------------------------------------------------------------------------
+RHS_MODEL_NAME = RHS_MODEL_PATH.split('/')[1]
 
 # Dataset
 # -------------------------------------------------------------------------------------------------
-DATASET_PATH = "RLHF-And-Friends/tldr-sft"
+DATASET_PATH = "RLHF-And-Friends/tldr-ppo"
 DATASET_SPLIT = "test"
 PROMPT_FIELD = "prompt"
-SIZE = 1000
+SIZE = 100
 # -------------------------------------------------------------------------------------------------
 DATASET_NAME = DATASET_PATH.split('/')[1]
 
 # HF repo
 # -------------------------------------------------------------------------------------------------
-HF_REPO_ID = "RLHF-And-Friends/Humans-vs-Llama-SmallSFT-PPO"
+HF_REPO_ID = "RLHF-And-Friends/Llama-Base-TLDR-PPO-vs-Llama-Base"
 
 README_TEXT = f"""---
 tags: [rlhf, tldr, radfan]
 ---
 
-This dataset contains human completions from {DATASET_PATH} {DATASET_SPLIT} split and {MODEL_PATH} completions.
+This dataset contains responses of two models given prompt.
 
-The column "prompt" contains prompt given both to humans and the models.
+The column "prompt" contains prompt given to both models. Two other columns contain reponses of respective models.
 
-Model used:
+Models used:
 
-Model: **{MODEL_NAME}**.
+Left: **{LHS_MODEL_NAME}**,
+Right: **{RHS_MODEL_NAME}**.
 
-Original dataset with prompts and human completions: **{DATASET_PATH}**.
+Original dataset with prompts: **{DATASET_PATH}**.
 """
 
 # #################################################################################################
-# FORMAT COMPLETIONS & INFERENCE
+# INFERENCE
 # #################################################################################################
 
-# Load dataset with prompts and human completions and concat them
+# Load prompt dataset
 # =================================================================================================
 
 test_dataset = load_dataset(DATASET_PATH, split=DATASET_SPLIT).select(range(SIZE))
 
-test_dataset = test_dataset.map(
-    cat_columns_contents,
-    fn_kwargs={
-        "lhs_column_names": ["prompt"],
-        "rhs_column_names": ["completion"],
-        "cat_column_names": ["human"],
-    },
-    desc = "Prompt completion concatenation",
-    load_from_cache_file=False,
-)
-test_dataset = test_dataset.remove_columns(["completion"])
-
 prompts = list(test_dataset[PROMPT_FIELD])
+
 
 # Inference
 # =================================================================================================
 
-model_completions = get_responses(
+lhs_completions = get_responses(
     prompts=prompts,
-    model_path=MODEL_PATH,
-    tokenizer_path=TOKENIZER_PATH,
+    model_path=LHS_MODEL_PATH,
+    tokenizer_path=LHS_TOKENIZER_PATH,
+    batch_size=32
+)
+rhs_completions = get_responses(
+    prompts=prompts,
+    model_path=RHS_MODEL_PATH,
+    tokenizer_path=RHS_TOKENIZER_PATH,
     batch_size=32
 )
 
@@ -85,10 +87,17 @@ model_completions = get_responses(
 # Create dataset and push it to HF Hub
 # -------------------------------------------------------------------------------------------------
 
-test_dataset = test_dataset.add_column(f"{MODEL_NAME}", model_completions)
+responses_dataset = Dataset.from_dict(
+    {
+        'prompt': prompts, 
+        f'{LHS_MODEL_NAME}': lhs_completions,
+        f'{RHS_MODEL_NAME}': rhs_completions
+    },
+    split="test"
+)
 
 push_dataset_to_hub_with_retries(
-    test_dataset,
+    responses_dataset,
     repo_id=f"{HF_REPO_ID}",
 )
 

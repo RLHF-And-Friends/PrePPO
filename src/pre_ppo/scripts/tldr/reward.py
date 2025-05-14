@@ -19,7 +19,7 @@ from trl import (
     get_quantization_config,
 )
 
-from hf_ppo.utils import (
+from pre_ppo.utils import (
     push_to_hub_with_retries
 )
 

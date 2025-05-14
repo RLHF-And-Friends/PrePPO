@@ -2,8 +2,8 @@ from datasets import load_dataset
 
 from transformers import AutoTokenizer
 
-from hf_ppo.utils import push_dataset_to_hub_with_retries
-from hf_ppo.data_utils import apply_chat_template, DatasetFormat
+from pre_ppo.utils import push_dataset_to_hub_with_retries
+from pre_ppo.data_utils import apply_chat_template, DatasetFormat
 
 
 # Load dataset
