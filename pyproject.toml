@@ -3,15 +3,15 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hf_ppo"
+name = "preppo"
 version = "0.0.1"
 authors = [
-    {name = "Arkadiy Vladimirov", email = "ark.vladimirov@outlook.com"},
     {name = "Evgeny Gurov", email = "evgurovv@gmail.com"},
+    {name = "Arkadiy Vladimirov", email = "ark.vladimirov@outlook.com"},
 ]
-description = "Huggingface PPO training pipeline for RLHF"
+description = "Auxilary preparation steps for RLHF PPO"
 readme = "README.md"
-license = { file = "LICENSE.md" }
+license = { file = "LICENSE" }
 requires-python = ">=3.10"
 dependencies = [
 	# huggingface ecosystem
