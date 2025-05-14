@@ -1,1 +1,3 @@
-# PPO training pipeline based on Huggingface ecosystem
+# Repo with some preparation steps for RLHF PPO
+
+This repo contains auxilary code for training PPO during RLHF. It is used to prepare datasets, train SFT and Reward models for [https://github.com/RLHF-And-Friends/TunePPO]{TunePPO} repo.
