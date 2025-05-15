@@ -83,7 +83,7 @@ for subreddit in train_subreddits:
 # Loaad new dataset to hub
 # =================================================================================================
 
-repo_id = "RLHF-And-Friends/tldr-thematic"
+repo_id = "anonymous-organization/tldr-thematic"
 
 for subreddit, subset in subsets.items():
     subset.push_to_hub(repo_id, config_name=subreddit)

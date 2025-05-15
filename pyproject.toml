@@ -29,7 +29,9 @@ dependencies = [
 	# evaluation judge
 	"openai",
 	# inference
-	"vllm"
+	"vllm",
+	# plotting
+	"matplotlib"
 ]
 
 [tool.ruff]
