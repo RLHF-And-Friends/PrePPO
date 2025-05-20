@@ -107,12 +107,13 @@ def push_dataset_to_hub_with_retries(
     dataset: Dataset,
     repo_id: str,
     max_retries: int = 10,
-    delay: int = 5
+    delay: int = 5,
+    **kwargs,
 ):
     for attempt in range(max_retries):
         try:
             print(f"Attempt {attempt + 1} to push...")
-            dataset.push_to_hub(repo_id=repo_id)
+            dataset.push_to_hub(repo_id=repo_id, **kwargs)
             print("✅ Push successful!")
             return
         except Exception as e:

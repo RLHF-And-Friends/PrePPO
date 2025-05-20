@@ -3,10 +3,9 @@ import typing as tp
 import re
 from tqdm import tqdm
 
-from datasets import load_dataset, DatasetDict, Dataset
+from datasets import load_dataset, DatasetDict, Dataset, concatenate_datasets
 
 from pre_ppo.utils import push_dataset_to_hub_with_retries
-
 
 # Load dataset
 # =================================================================================================
@@ -54,7 +53,7 @@ print(
 def subreddit_filter(element, subreddit: str):
     prompt = element["prompt"]
     elem_subreddit = get_subreddit(prompt)
-    
+
     return subreddit == elem_subreddit
 
 
@@ -72,10 +71,12 @@ for subreddit in train_subreddits:
         subreddit_filter,
         fn_kwargs={"subreddit": subreddit}
     )
+    subreddit_subset_val = concatenate_datasets(
+        [subreddit_subset_val, subreddit_subset_test]
+    )
     subreddit_subset = DatasetDict({
         "train": subreddit_subset_train,
         "validation": subreddit_subset_val,
-        "test": subreddit_subset_test
     })
     subsets[subreddit] = subreddit_subset
 
@@ -83,7 +84,8 @@ for subreddit in train_subreddits:
 # Loaad new dataset to hub
 # =================================================================================================
 
-repo_id = "anonymous-organization/tldr-thematic"
+repo_id = "RLHF-And-Friends/tldr-thematic"
 
 for subreddit, subset in subsets.items():
-    subset.push_to_hub(repo_id, config_name=subreddit)
+    # subset.push_to_hub(repo_id, config_name=subreddit)
+    push_dataset_to_hub_with_retries(subset, repo_id=repo_id, config_name=subreddit, delay=30)
