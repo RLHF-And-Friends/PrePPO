@@ -1,5 +1,8 @@
 import os
 
+import copy
+from types import MethodType
+
 import torch
 
 from datasets import load_dataset
@@ -30,7 +33,8 @@ from pre_ppo.utils import (
 
 # Model path
 # =================================================================================================
-MODEL_PATH = "RLHF-And-Friends/TLDR-Llama-3.2-3B-SmallSFT"
+# MODEL_PATH = "RLHF-And-Friends/TLDR-Llama-3.2-1B-SmallSFT"
+MODEL_PATH = "RLHF-And-Friends/TLDR-Qwen2-0.5B-SmallSFT"
 MODEL_NAME = MODEL_PATH.split('/')[1]
 
 # Dataset path
@@ -43,7 +47,7 @@ DATASET_NAME        = DATASET_PATH.split('/')[1]
 # Project name
 # =================================================================================================
 PROJECT_NAME = "RM-TLDR"
-EXP_NAME = f"{MODEL_NAME}"
+EXP_NAME = f"{MODEL_NAME}-lr-1e-5"
 
 # WandB
 # =================================================================================================
@@ -100,9 +104,9 @@ training_args = RewardConfig(
     run_name                    = EXP_NAME,
     output_dir                  = f"~/hf/models/{PROJECT_NAME}/{EXP_NAME}",
     num_train_epochs            = 1,
-    per_device_train_batch_size = 2,
-    per_device_eval_batch_size  = 2,
-    gradient_accumulation_steps = 8,
+    per_device_train_batch_size = 8,
+    per_device_eval_batch_size  = 8,
+    gradient_accumulation_steps = 2,
     gradient_checkpointing      = False,
     bf16                        = True,
     
@@ -133,23 +137,40 @@ initial_tokenizer = AutoTokenizer.from_pretrained(
     model_config.model_name_or_path
 )
 
-tokenizer = AutoTokenizer.from_pretrained(
+# Overwrite __call__ to add EOS token
+# -------------------------------------------------------------------------------------------------
+
+class TokenizerWithEOS(initial_tokenizer.__class__):
+    def __call__(self, text, **kwargs):
+        kwargs = dict(kwargs)
+
+        enc = super().__call__(text, **kwargs)
+
+        if isinstance(text, str):
+            enc["input_ids"].append(self.eos_token_id)
+            enc["attention_mask"].append(1)
+        else:  # list/iterable of strings
+            enc["input_ids"]     = [ids  + [self.eos_token_id] for ids  in enc["input_ids"]]
+            enc["attention_mask"] = [mask + [1] for mask in enc["attention_mask"]]
+
+        return enc
+
+tokenizer = TokenizerWithEOS.from_pretrained(
     model_config.model_name_or_path,
     pad_token = "<|pad|>",
-    add_eos_token = True, # To add EOS token during tokenization (does not work for Llama3 tokenizer)
 )
 
 # Add postrprocessor to add EOS token (Only for Llama3 model!!!)
 # -------------------------------------------------------------------------------------------------
 
-tokenizer._tokenizer.post_processor = processors.TemplateProcessing(
-    single=f"{tokenizer.bos_token}:0 $A:0 {tokenizer.eos_token}:0",
-    pair=f"{tokenizer.bos_token}:0 $A:0 {tokenizer.bos_token}:1 $B:1 {tokenizer.eos_token}:1",
-    special_tokens=[
-        (tokenizer.bos_token, tokenizer.bos_token_id),
-        (tokenizer.eos_token, tokenizer.eos_token_id),
-    ],
-)
+# tokenizer._tokenizer.post_processor = processors.TemplateProcessing(
+#     single=f"{tokenizer.bos_token}:0 $A:0 {tokenizer.eos_token}:0",
+#     pair=f"{tokenizer.bos_token}:0 $A:0 {tokenizer.bos_token}:1 $B:1 {tokenizer.eos_token}:1",
+#     special_tokens=[
+#         (tokenizer.bos_token, tokenizer.bos_token_id),
+#         (tokenizer.eos_token, tokenizer.eos_token_id),
+#     ],
+# )
 
 # Model
 # =================================================================================================
@@ -170,6 +191,7 @@ model = AutoModelForSequenceClassification.from_pretrained(
     quantization_config = quantization_config,
     torch_dtype = torch_dtype,
 )
+initial_model_config = copy.deepcopy(model.config)
 
 if model_config.load_in_4bit or model_config.load_in_8bit:
     model = prepare_model_for_kbit_training(
@@ -216,15 +238,19 @@ def main() -> None:
 
     # Delete PAD token from the model's vocabulary
     # ---------------------------------------------------------------------------------------------
-    trainer.model.resize_token_embeddings(len(tokenizer) - 1)
+    trainer.model.resize_token_embeddings(initial_model_config.vocab_size)
 
     # Revert tokenizer to the initial state
     # ---------------------------------------------------------------------------------------------
-    trainer.tokenizer = initial_tokenizer
+    trainer.processing_class = initial_tokenizer
 
     # Merge LoRA adapters into the model
     # ---------------------------------------------------------------------------------------------
     trainer.model = trainer.model.merge_and_unload()
+    
+    # Set initial model config
+    # ---------------------------------------------------------------------------------------------
+    trainer.model.config = initial_model_config
 
     # Push model to hub
     # ---------------------------------------------------------------------------------------------

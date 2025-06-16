@@ -31,7 +31,8 @@ from pre_ppo.utils import push_to_hub_with_retries
 
 # Model path
 # =================================================================================================
-MODEL_PATH = "meta-llama/Llama-3.2-3B"
+# MODEL_PATH = "meta-llama/Llama-3.2-1B"
+MODEL_PATH = "Qwen/Qwen2-0.5B"
 MODEL_NAME = MODEL_PATH.split('/')[1]
 
 # Dataset path
@@ -108,7 +109,7 @@ training_args = SFTConfig(
 
     # Optimizer
     # ---------------------------------------------------------------------------------------------
-    learning_rate = 1e-5,
+    learning_rate = 1e-4,
 
     # Logs
     # ---------------------------------------------------------------------------------------------
@@ -233,7 +234,7 @@ def main() -> None:
 
     # Delete PAD token from the model's vocabulary
     # ---------------------------------------------------------------------------------------------
-    trainer.model.resize_token_embeddings(len(initial_tokenizer))
+    trainer.model.resize_token_embeddings(initial_model_config.vocab_size)
 
     # Revert tokenizer to the initial state
     # ---------------------------------------------------------------------------------------------
